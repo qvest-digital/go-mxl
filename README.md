@@ -31,6 +31,24 @@ pkg-config --cflags --libs libmxl
 If that returns include and link flags, `go build` works without any
 extra environment.
 
+### Non-default install locations
+
+If libmxl is installed somewhere `pkg-config` does not search by
+default, point it at the directory containing the `libmxl.pc` file. A `.env` at the repo root
+(gitignored) is one convenient place; pick whatever your editor or
+shell tooling reads from.
+
+```sh
+# .env
+PKG_CONFIG_PATH=/opt/libmxl/lib/pkgconfig
+
+# Some libmxl installs declare transitive libs as Requires.private,
+# which pkg-config only emits with --static. Set CGO_LDFLAGS in
+# addition to the path above if `go build` reports unresolved symbols
+# against spdlog / fmt / libmxl-common.
+#CGO_LDFLAGS=-L/opt/libmxl/lib -lmxl -lmxl-common -lspdlog -lfmt -lstdc++
+```
+
 ## Usage
 
 ```go
