@@ -1,7 +1,6 @@
 // write-grain creates (or opens) a discrete MXL flow from a JSON flow
 // definition file and writes a deterministic synthetic pattern into each
-// grain at the flow's nominal grain rate. Mirrors the discrete path of
-// rust/mxl/examples/flow-writer.rs.
+// grain at the flow's nominal grain rate.
 //
 // Usage:
 //

@@ -1,12 +1,11 @@
-// read-grain subscribes to an MXL flow and prints a summary of each grain it
-// observes. Mirrors rust/mxl/examples/flow-reader.rs.
+// read-grain subscribes to a discrete MXL flow and prints a summary of
+// each grain it observes.
 //
 // Usage:
 //
 //	read-grain -domain /dev/shm/mxl -flow <uuid>
 //
-// Run a writer (e.g. examples/Dockerfile.writer.video.loop.multistage or
-// tools/mxl-info) in another shell first so the flow exists.
+// A writer must be producing into the same domain before this runs.
 package main
 
 import (

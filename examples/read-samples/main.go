@@ -1,12 +1,11 @@
 // read-samples subscribes to a continuous (audio) MXL flow and prints a
-// summary of each sample batch it observes. Mirror of read-grain for the
-// continuous side of the API.
+// summary of each sample batch it observes.
 //
 // Usage:
 //
 //	read-samples -domain /dev/shm/mxl -flow <uuid>
 //
-// Run write-samples (or any other producer) in another shell first.
+// A writer must be producing into the same domain before this runs.
 package main
 
 import (

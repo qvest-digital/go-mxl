@@ -1,7 +1,6 @@
 // write-samples creates (or opens) a continuous (audio) MXL flow and writes
 // a deterministic synthetic pattern into batches of samples at the flow's
-// nominal sample rate. Mirrors the continuous path of
-// rust/mxl/examples/flow-writer.rs.
+// nominal sample rate.
 //
 // Usage:
 //
