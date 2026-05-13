@@ -41,7 +41,7 @@ import (
     "log"
     "time"
 
-    mxl "github.com/qvest-digital/go-mxl"
+    "github.com/qvest-digital/go-mxl/mxl"
 )
 
 func main() {

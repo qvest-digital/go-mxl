@@ -17,7 +17,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/qvest-digital/go-mxl"
+	"github.com/qvest-digital/go-mxl/mxl"
 )
 
 func main() {

@@ -18,7 +18,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/qvest-digital/go-mxl"
+	"github.com/qvest-digital/go-mxl/mxl"
 )
 
 func main() {

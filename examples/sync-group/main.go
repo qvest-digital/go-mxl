@@ -22,7 +22,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/qvest-digital/go-mxl"
+	"github.com/qvest-digital/go-mxl/mxl"
 )
 
 type flowList []string
