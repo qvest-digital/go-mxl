@@ -25,7 +25,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             build-essential cmake ninja-build clang-19 lld-19 \
-            pkg-config bison flex curl zip unzip tar git ca-certificates
+            pkg-config bison flex curl zip unzip tar git ca-certificates \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
 
       - name: Cache vcpkg packages
         uses: actions/cache@v4
