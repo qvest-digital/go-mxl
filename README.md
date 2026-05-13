@@ -40,7 +40,7 @@ shell tooling reads from.
 
 ```sh
 # .env
-PKG_CONFIG_PATH=/opt/libmxl/lib/pkgconfig
+PKG_CONFIG_PATH=/opt/libmxl/lib
 
 # Some libmxl installs declare transitive libs as Requires.private,
 # which pkg-config only emits with --static. Set CGO_LDFLAGS in
