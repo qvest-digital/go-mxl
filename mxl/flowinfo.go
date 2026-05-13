@@ -63,14 +63,14 @@ func (r Rational) Float64() float64 {
 
 // CommonFlowConfig is the format-independent part of a flow's configuration.
 type CommonFlowConfig struct {
-	ID                    [16]byte
-	Format                DataFormat
-	Flags                 uint32
-	GrainRate             Rational
+	ID                     [16]byte
+	Format                 DataFormat
+	Flags                  uint32
+	GrainRate              Rational
 	MaxCommitBatchSizeHint uint32
 	MaxSyncBatchSizeHint   uint32
-	PayloadLocation       PayloadLocation
-	DeviceIndex           int32
+	PayloadLocation        PayloadLocation
+	DeviceIndex            int32
 }
 
 // DiscreteFlowConfig holds video/data-specific config.

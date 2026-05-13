@@ -23,8 +23,8 @@ import (
 
 func main() {
 	var (
-		domain  = flag.String("domain", "/dev/shm/mxl", "MXL domain directory (tmpfs)")
-		flowID  = flag.String("flow", "", "Flow UUID to read")
+		domain = flag.String("domain", "/dev/shm/mxl", "MXL domain directory (tmpfs)")
+		flowID = flag.String("flow", "", "Flow UUID to read")
 		// Keep the timeout small relative to the ring buffer's live window
 		// (bufferLength/2 - count). For 48 kHz with a 480-sample batch and
 		// a 19456-sample buffer the window is ~190 ms; if GetSamples waits
