@@ -1,0 +1,84 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read libmxl pin
+        id: libmxl
+        run: echo "sha=$(cat .github/libmxl.version)" >> "$GITHUB_OUTPUT"
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build clang-19 lld-19 \
+            pkg-config bison flex curl zip unzip tar git ca-certificates
+
+      - name: Cache vcpkg packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/vcpkg
+            ~/.cache/vcpkg/archives
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('.github/libmxl.version') }}
+
+      - name: Bootstrap vcpkg
+        run: |
+          if [ ! -x ~/vcpkg/vcpkg ]; then
+            rm -rf ~/vcpkg
+            git clone --depth 1 https://github.com/microsoft/vcpkg.git ~/vcpkg
+            ~/vcpkg/bootstrap-vcpkg.sh -disableMetrics
+          fi
+
+      - name: Build and install libmxl
+        run: |
+          set -euo pipefail
+          git clone https://github.com/dmf-mxl/mxl.git /tmp/mxl
+          git -C /tmp/mxl checkout ${{ steps.libmxl.outputs.sha }}
+          cd /tmp/mxl
+          cmake --preset Linux-Clang-Release -DBUILD_DOCS=OFF
+          cmake --build build/Linux-Clang-Release
+          sudo cmake --install build/Linux-Clang-Release --prefix /opt/libmxl
+          # libmxl.pc declares `Requires.private: spdlog` but the install
+          # tree ships spdlog as a static library only (no .pc). With
+          # dynamic linking the dependency is satisfied via libmxl-common.so's
+          # DT_NEEDED entries; the Requires line only confuses pkg-config.
+          sudo sed -i '/^Requires.private:/d' /opt/libmxl/lib/pkgconfig/libmxl.pc
+
+      - name: Expose libmxl to subsequent steps
+        run: |
+          echo "PKG_CONFIG_PATH=/opt/libmxl/lib/pkgconfig" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=/opt/libmxl/lib" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          check-latest: true
+
+      - name: gofmt
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then
+            echo "Files need gofmt:"
+            echo "$out"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go build
+        run: go build ./...
