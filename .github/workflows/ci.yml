@@ -39,7 +39,11 @@ jobs:
         run: |
           if [ ! -x ~/vcpkg/vcpkg ]; then
             rm -rf ~/vcpkg
-            git clone --depth 1 https://github.com/microsoft/vcpkg.git ~/vcpkg
+            # `--filter=tree:0` keeps the clone small but still lets `git show`
+            # resolve the `builtin-baseline` commit referenced in libmxl's
+            # vcpkg.json. A plain `--depth 1` clone breaks vcpkg's baseline
+            # checkout.
+            git clone --filter=tree:0 https://github.com/microsoft/vcpkg.git ~/vcpkg
             ~/vcpkg/bootstrap-vcpkg.sh -disableMetrics
           fi
 
