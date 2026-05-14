@@ -87,7 +87,7 @@ jobs:
           echo "PKG_CONFIG_PATH=/opt/libmxl/lib/pkgconfig" >> "$GITHUB_ENV"
           echo "LD_LIBRARY_PATH=/opt/libmxl/lib" >> "$GITHUB_ENV"
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: '1.26'
           check-latest: true
