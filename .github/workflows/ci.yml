@@ -18,7 +18,20 @@ jobs:
 
       - name: Read libmxl pin
         id: libmxl
-        run: echo "sha=$(cat .github/libmxl.version)" >> "$GITHUB_OUTPUT"
+        run: |
+          # .github/libmxl.version holds a github.com/<owner>/<repo>/tree/<ref>
+          # URL; <ref> may be a tag, branch, or SHA on the upstream repo or
+          # any fork. Split it into the clone URL and the ref.
+          url=$(tr -d '[:space:]' < .github/libmxl.version)
+          rest=${url#https://github.com/}
+          repo=${rest%%/tree/*}
+          ref=${rest#*/tree/}
+          if [ "$rest" = "$ref" ] || [ -z "$repo" ] || [ -z "$ref" ]; then
+            echo "::error file=.github/libmxl.version::expected https://github.com/<owner>/<repo>/tree/<ref>, got: $url"
+            exit 1
+          fi
+          echo "clone_url=https://github.com/$repo.git" >> "$GITHUB_OUTPUT"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
 
       - name: Install build dependencies
         run: |
@@ -51,8 +64,8 @@ jobs:
       - name: Build and install libmxl
         run: |
           set -euo pipefail
-          git clone https://github.com/dmf-mxl/mxl.git /tmp/mxl
-          git -C /tmp/mxl checkout ${{ steps.libmxl.outputs.sha }}
+          git clone "${{ steps.libmxl.outputs.clone_url }}" /tmp/mxl
+          git -C /tmp/mxl checkout "${{ steps.libmxl.outputs.ref }}"
           cd /tmp/mxl
           # CMAKE_INSTALL_PREFIX must be set at configure time so libmxl.pc
           # ships with absolute paths under /opt/libmxl. Passing only
