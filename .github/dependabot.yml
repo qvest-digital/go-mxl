@@ -1,0 +1,22 @@
+version: 2
+
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+      - go
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+      - github-actions
+
+# The pin in .github/libmxl.version is tracked by Renovate's custom regex
+# manager (see renovate.json) — Dependabot has no ecosystem that can match
+# tagged releases of a non-Action GitHub repo from a custom file.
