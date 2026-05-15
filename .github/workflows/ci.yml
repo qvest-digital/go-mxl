@@ -97,24 +97,33 @@ jobs:
                 -DCMAKE_INSTALL_PREFIX=/opt/libmxl
           cmake --build build/Linux-Clang-Release
           cmake --install build/Linux-Clang-Release
-          # libmxl.pc and libmxl-fabrics.pc both declare
-          # `Requires.private: spdlog` but the install tree ships
-          # spdlog as a static library only (no .pc). With dynamic
-          # linking the dependency is satisfied via DT_NEEDED entries;
-          # the Requires line only confuses pkg-config.
-          sed -i '/^Requires.private:/d' \
-              /opt/libmxl/lib/pkgconfig/libmxl.pc \
-              /opt/libmxl/lib/pkgconfig/libmxl-fabrics.pc
 
       - name: Expose libmxl to subsequent steps
         run: |
-          echo "PKG_CONFIG_PATH=/opt/libmxl/lib/pkgconfig" >> "$GITHUB_ENV"
-          echo "LD_LIBRARY_PATH=/opt/libmxl/lib" >> "$GITHUB_ENV"
+          # libmxl.pc / libmxl-fabrics.pc carry `Requires.private: spdlog`
+          # (and fmt), but `cmake --install` only puts libmxl's own .pc
+          # files under /opt/libmxl. vcpkg's spdlog.pc / fmt.pc stay in
+          # the build tree at build/<preset>/vcpkg_installed/<triplet>/
+          # lib/pkgconfig — add that to PKG_CONFIG_PATH so pkg-config
+          # can resolve the private deps without us having to edit the
+          # installed .pc files. spdlog and fmt are statically linked
+          # into libmxl{,-fabrics}.so, so runtime needs nothing extra.
+          {
+            echo "PKG_CONFIG_PATH=/opt/libmxl/lib/pkgconfig:/tmp/mxl/build/Linux-Clang-Release/vcpkg_installed/x64-linux/lib/pkgconfig"
+            echo "LD_LIBRARY_PATH=/opt/libmxl/lib"
+          } >> "$GITHUB_ENV"
 
       - uses: actions/setup-go@v5
         with:
           go-version: '1.26'
           check-latest: true
+
+      # `go build` embeds VCS info by running `git status` in the
+      # workspace. Containerized jobs run as root against a checkout
+      # owned by the runner uid, so git refuses with "safe.directory"
+      # unless we whitelist it explicitly.
+      - name: Mark workspace as a safe git directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: gofmt
         run: |
