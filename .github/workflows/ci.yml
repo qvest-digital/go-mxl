@@ -11,9 +11,22 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04
+    # libmxl-fabrics uses fi_fabric2, which lands in libfabric 2.x.
+    # Ubuntu 24.04 only ships libfabric 1.17 via apt; Debian trixie
+    # ships 2.1, matching what dmf-mxl/mxl builds against upstream.
+    container:
+      image: debian:trixie
     timeout-minutes: 30
 
     steps:
+      # actions/checkout shells out to git; minimal Debian images don't
+      # ship it, so install it (and CA roots for HTTPS) before anything
+      # else. The rest of the build deps land in a later step.
+      - name: Install base tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates git
+
       - uses: actions/checkout@v4
 
       - name: Read libmxl pin
@@ -35,10 +48,9 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          apt-get install -y --no-install-recommends \
             build-essential cmake ninja-build clang-19 lld-19 \
-            pkg-config bison flex curl zip unzip tar git ca-certificates \
+            pkg-config bison flex curl zip unzip tar \
             libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
             libfabric-dev libfabric-bin
 
@@ -48,7 +60,7 @@ jobs:
           path: |
             ~/vcpkg
             ~/.cache/vcpkg/archives
-          key: vcpkg-${{ runner.os }}-${{ hashFiles('.github/libmxl.version') }}
+          key: vcpkg-debian-trixie-${{ hashFiles('.github/libmxl.version') }}
 
       - name: Bootstrap vcpkg
         run: |
@@ -77,12 +89,12 @@ jobs:
                 -DMXL_ENABLE_FABRICS_OFI=ON \
                 -DCMAKE_INSTALL_PREFIX=/opt/libmxl
           cmake --build build/Linux-Clang-Release
-          sudo cmake --install build/Linux-Clang-Release
+          cmake --install build/Linux-Clang-Release
           # libmxl.pc declares `Requires.private: spdlog` but the install
           # tree ships spdlog as a static library only (no .pc). With
           # dynamic linking the dependency is satisfied via libmxl-common.so's
           # DT_NEEDED entries; the Requires line only confuses pkg-config.
-          sudo sed -i '/^Requires.private:/d' /opt/libmxl/lib/pkgconfig/libmxl.pc
+          sed -i '/^Requires.private:/d' /opt/libmxl/lib/pkgconfig/libmxl.pc
 
       - name: Expose libmxl to subsequent steps
         run: |
