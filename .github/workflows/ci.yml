@@ -39,7 +39,8 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             build-essential cmake ninja-build clang-19 lld-19 \
             pkg-config bison flex curl zip unzip tar git ca-certificates \
-            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+            libfabric-dev libfabric-bin
 
       - name: Cache vcpkg packages
         uses: actions/cache@v4
@@ -73,6 +74,7 @@ jobs:
           # .pc paths pointing at the preset's default install dir.
           cmake --preset Linux-Clang-Release \
                 -DBUILD_DOCS=OFF \
+                -DMXL_ENABLE_FABRICS_OFI=ON \
                 -DCMAKE_INSTALL_PREFIX=/opt/libmxl
           cmake --build build/Linux-Clang-Release
           sudo cmake --install build/Linux-Clang-Release
