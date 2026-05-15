@@ -165,3 +165,12 @@ func (i *Instance) FlowDef(flowID string) (string, error) {
 func (i *Instance) rawHandle() C.mxlInstance {
 	return i.handle
 }
+
+// Handle returns the underlying C handle as an opaque pointer for use
+// by the sister fabrics sub-package, which crosses a cgo package
+// boundary and therefore cannot see C.mxlInstance directly. Callers
+// must not retain the pointer past Close; the fabrics types pin the
+// Instance so practical use stays safe.
+func (i *Instance) Handle() unsafe.Pointer {
+	return unsafe.Pointer(i.handle)
+}
