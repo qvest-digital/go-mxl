@@ -3,139 +3,136 @@ name: ci
 on:
   push:
     branches: [main]
+    tags: ['v*.*.*']
   pull_request:
 
 permissions:
   contents: read
+  packages: write
 
 jobs:
   build:
     runs-on: ubuntu-24.04
-    # libmxl-fabrics uses fi_fabric2, which lands in libfabric 2.x.
-    # Ubuntu 24.04 only ships libfabric 1.17 via apt; Debian trixie
-    # ships 2.1, matching what dmf-mxl/mxl builds against upstream.
-    container:
-      image: debian:trixie
-    timeout-minutes: 30
-
+    timeout-minutes: 60
     steps:
-      # actions/checkout shells out to git; minimal Debian images don't
-      # ship it, so install it (and CA roots for HTTPS) before anything
-      # else. The rest of the build deps land in a later step.
-      - name: Install base tools
-        run: |
-          apt-get update
-          apt-get install -y --no-install-recommends ca-certificates git
-
       - uses: actions/checkout@v4
 
-      - name: Read libmxl pin
-        id: libmxl
+      - name: Compute image metadata
+        id: meta
         run: |
-          # .github/libmxl.version holds a github.com/<owner>/<repo>/tree/<ref>
-          # URL; <ref> may be a tag, branch, or SHA on the upstream repo or
-          # any fork. Split it into the clone URL and the ref.
-          url=$(tr -d '[:space:]' < .github/libmxl.version)
-          rest=${url#https://github.com/}
-          repo=${rest%%/tree/*}
-          ref=${rest#*/tree/}
-          if [ "$rest" = "$ref" ] || [ -z "$repo" ] || [ -z "$ref" ]; then
-            echo "::error file=.github/libmxl.version::expected https://github.com/<owner>/<repo>/tree/<ref>, got: $url"
-            exit 1
-          fi
-          echo "clone_url=https://github.com/$repo.git" >> "$GITHUB_OUTPUT"
-          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          set -eu
+          # The pin file holds https://github.com/<owner>/<repo>/tree/<ref>.
+          # Pass the URL through verbatim as a build arg, and derive the
+          # short ref for the content-addressed image tag (`libmxl-<sha>`)
+          # so the image identity tracks the libmxl revision rather than
+          # the go-mxl commit that built it.
+          libmxl_url=$(tr -d '[:space:]' < .github/libmxl.version)
+          libmxl_ref=${libmxl_url##*/tree/}
+          libmxl_short=${libmxl_ref:0:7}
 
-      - name: Install build dependencies
-        run: |
-          apt-get install -y --no-install-recommends \
-            build-essential cmake ninja-build clang-19 lld-19 \
-            pkg-config bison flex curl zip unzip tar \
-            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
-            libfabric-dev libfabric-bin
-          # Trixie installs versioned clang-19/lld-19 only. The
-          # libmxl CMake preset references unversioned `clang`,
-          # `clang++`, and (via CMAKE_LINKER_TYPE=LLD) `ld.lld`.
-          # Provide them in /usr/local/bin (ahead of /usr/bin in PATH).
-          ln -sf /usr/bin/clang-19 /usr/local/bin/clang
-          ln -sf /usr/bin/clang++-19 /usr/local/bin/clang++
-          ln -sf /usr/bin/ld.lld-19 /usr/local/bin/ld.lld
+          owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          builder=ghcr.io/${owner}/go-mxl-builder
+          runtime=ghcr.io/${owner}/go-mxl-runtime
+          builder_image="${builder}:libmxl-${libmxl_short}"
+          runtime_image="${runtime}:libmxl-${libmxl_short}"
 
-      - name: Cache vcpkg packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/vcpkg
-            ~/.cache/vcpkg/archives
-          key: vcpkg-debian-trixie-${{ hashFiles('.github/libmxl.version') }}
-
-      - name: Bootstrap vcpkg
-        run: |
-          if [ ! -x ~/vcpkg/vcpkg ]; then
-            rm -rf ~/vcpkg
-            # `--filter=tree:0` keeps the clone small but still lets `git show`
-            # resolve the `builtin-baseline` commit referenced in libmxl's
-            # vcpkg.json. A plain `--depth 1` clone breaks vcpkg's baseline
-            # checkout.
-            git clone --filter=tree:0 https://github.com/microsoft/vcpkg.git ~/vcpkg
-            ~/vcpkg/bootstrap-vcpkg.sh -disableMetrics
+          # `push` gates registry writes. Floating tags (`:dev`, `:latest`,
+          # `:<version>`) are reserved for push events on main / release
+          # tags so PR runs cannot clobber them. PR runs from the same
+          # repo still publish the content-addressed `:libmxl-<sha>` tag
+          # so `ci.yml` (and downstream consumers) can pull the exact
+          # image the PR builds. PRs from forks get a read-only token
+          # and skip the push entirely.
+          builder_tags="${builder_image}"
+          runtime_tags="${runtime_image}"
+          push=false
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            push=true
+            if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+              version=${GITHUB_REF_NAME#v}
+              builder_tags="${builder_tags},${builder}:${version},${builder}:latest"
+              runtime_tags="${runtime_tags},${runtime}:${version},${runtime}:latest"
+            else
+              builder_tags="${builder_tags},${builder}:dev"
+              runtime_tags="${runtime_tags},${runtime}:dev"
+            fi
+          elif [ "$GITHUB_EVENT_NAME" = "pull_request" ] \
+              && [ "${{ github.event.pull_request.head.repo.full_name }}" = "${{ github.repository }}" ]; then
+            push=true
           fi
 
-      - name: Build and install libmxl
-        run: |
-          set -euo pipefail
-          git clone "${{ steps.libmxl.outputs.clone_url }}" /tmp/mxl
-          git -C /tmp/mxl checkout "${{ steps.libmxl.outputs.ref }}"
-          cd /tmp/mxl
-          # CMAKE_INSTALL_PREFIX must be set at configure time so libmxl.pc
-          # ships with absolute paths under /opt/libmxl. Passing only
-          # `cmake --install --prefix` would put files there but leave the
-          # .pc paths pointing at the preset's default install dir.
-          cmake --preset Linux-Clang-Release \
-                -DBUILD_DOCS=OFF \
-                -DMXL_ENABLE_FABRICS_OFI=ON \
-                -DCMAKE_INSTALL_PREFIX=/opt/libmxl
-          cmake --build build/Linux-Clang-Release
-          cmake --install build/Linux-Clang-Release
-
-      - name: Expose libmxl to subsequent steps
-        run: |
-          # libmxl.pc / libmxl-fabrics.pc carry `Requires.private: spdlog`
-          # (and fmt), but `cmake --install` only puts libmxl's own .pc
-          # files under /opt/libmxl. vcpkg's spdlog.pc / fmt.pc stay in
-          # the build tree at build/<preset>/vcpkg_installed/<triplet>/
-          # lib/pkgconfig — add that to PKG_CONFIG_PATH so pkg-config
-          # can resolve the private deps without us having to edit the
-          # installed .pc files. spdlog and fmt are statically linked
-          # into libmxl{,-fabrics}.so, so runtime needs nothing extra.
           {
-            echo "PKG_CONFIG_PATH=/opt/libmxl/lib/pkgconfig:/tmp/mxl/build/Linux-Clang-Release/vcpkg_installed/x64-linux/lib/pkgconfig"
-            echo "LD_LIBRARY_PATH=/opt/libmxl/lib"
-          } >> "$GITHUB_ENV"
+            echo "libmxl_url=${libmxl_url}"
+            echo "libmxl_ref=${libmxl_ref}"
+            echo "builder_image=${builder_image}"
+            echo "builder_tags=${builder_tags}"
+            echo "runtime_tags=${runtime_tags}"
+            echo "push=${push}"
+          } >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-go@v5
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: steps.meta.outputs.push == 'true'
+        uses: docker/login-action@v3
         with:
-          go-version: '1.26'
-          check-latest: true
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      # `go build` embeds VCS info by running `git status` in the
-      # workspace. Containerized jobs run as root against a checkout
-      # owned by the runner uid, so git refuses with "safe.directory"
-      # unless we whitelist it explicitly.
-      - name: Mark workspace as a safe git directory
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      # `load: true` puts the image into the runner's docker daemon so
+      # the gofmt/vet/build step below can `docker run` it without a
+      # registry round-trip — and crucially, lets fork PRs (which cannot
+      # push) still exercise the Go toolchain against the freshly-built
+      # libmxl.
+      - name: Build builder image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: builder
+          load: true
+          push: ${{ steps.meta.outputs.push == 'true' }}
+          tags: ${{ steps.meta.outputs.builder_tags }}
+          build-args: |
+            LIBMXL_VERSION=${{ steps.meta.outputs.libmxl_url }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            io.qvest-digital.go-mxl.libmxl-ref=${{ steps.meta.outputs.libmxl_ref }}
+          cache-from: type=gha,scope=go-mxl-images
+          cache-to: type=gha,mode=max,scope=go-mxl-images
 
-      - name: gofmt
+      - name: Build runtime image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: runtime
+          push: ${{ steps.meta.outputs.push == 'true' }}
+          tags: ${{ steps.meta.outputs.runtime_tags }}
+          build-args: |
+            LIBMXL_VERSION=${{ steps.meta.outputs.libmxl_url }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            io.qvest-digital.go-mxl.libmxl-ref=${{ steps.meta.outputs.libmxl_ref }}
+          cache-from: type=gha,scope=go-mxl-images
+          cache-to: type=gha,mode=max,scope=go-mxl-images
+
+      - name: gofmt / go vet / go build
         run: |
-          out=$(gofmt -l .)
-          if [ -n "$out" ]; then
-            echo "Files need gofmt:"
-            echo "$out"
-            exit 1
-          fi
-
-      - name: go vet
-        run: go vet ./...
-
-      - name: go build
-        run: go build ./...
+          docker run --rm \
+            -v "$PWD:/src" -w /src \
+            -e GOCACHE=/tmp/gocache -e GOMODCACHE=/tmp/gomodcache \
+            "${{ steps.meta.outputs.builder_image }}" \
+            bash -ec '
+              out=$(gofmt -l .)
+              if [ -n "$out" ]; then
+                echo "Files need gofmt:"
+                echo "$out"
+                exit 1
+              fi
+              go vet ./...
+              go build ./...
+            '
