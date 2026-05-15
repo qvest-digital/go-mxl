@@ -98,6 +98,11 @@ See [examples/](examples/) for read/write programs covering both
 discrete grain and continuous sample flows, plus a synchronization
 group example.
 
+## Container images
+
+Prebuilt builder and runtime images are published to GHCR. See
+[`docs/docker.md`](docs/docker.md).
+
 ## Memory safety
 
 Byte slices returned by reads (`Grain.Payload`, `SamplesView` fragments)
