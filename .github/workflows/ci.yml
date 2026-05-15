@@ -53,6 +53,13 @@ jobs:
             pkg-config bison flex curl zip unzip tar \
             libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
             libfabric-dev libfabric-bin
+          # Trixie installs versioned clang-19/lld-19 only. The
+          # libmxl CMake preset references unversioned `clang`,
+          # `clang++`, and (via CMAKE_LINKER_TYPE=LLD) `ld.lld`.
+          # Provide them in /usr/local/bin (ahead of /usr/bin in PATH).
+          ln -sf /usr/bin/clang-19 /usr/local/bin/clang
+          ln -sf /usr/bin/clang++-19 /usr/local/bin/clang++
+          ln -sf /usr/bin/ld.lld-19 /usr/local/bin/ld.lld
 
       - name: Cache vcpkg packages
         uses: actions/cache@v4
