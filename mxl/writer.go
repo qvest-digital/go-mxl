@@ -104,6 +104,13 @@ func (w *Writer) Config() FlowConfig {
 	return w.config
 }
 
+// Handle returns the underlying C handle as an opaque pointer for use
+// by the sister fabrics sub-package. Callers must not retain the
+// pointer past Close; the fabrics types pin the Writer.
+func (w *Writer) Handle() unsafe.Pointer {
+	return unsafe.Pointer(w.handle)
+}
+
 // GrainInfo returns the current libmxl-side metadata for the grain at the
 // given index without opening it for mutation. Only valid on discrete flows.
 func (w *Writer) GrainInfo(index uint64) (Grain, error) {

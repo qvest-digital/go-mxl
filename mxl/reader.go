@@ -201,6 +201,13 @@ func (r *Reader) GetGrainSliceNonBlocking(index uint64, minValidSlices uint16) (
 	return makeGrain(&info, payload), nil
 }
 
+// Handle returns the underlying C handle as an opaque pointer for use
+// by the sister fabrics sub-package. Callers must not retain the
+// pointer past Close; the fabrics types pin the Reader.
+func (r *Reader) Handle() unsafe.Pointer {
+	return unsafe.Pointer(r.handle)
+}
+
 // makeGrain copies scalar metadata and aliases the payload into a Go slice.
 func makeGrain(info *C.mxlGrainInfo, payload *C.uint8_t) Grain {
 	size := int(info.grainSize)
