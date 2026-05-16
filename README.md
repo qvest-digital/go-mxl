@@ -103,6 +103,21 @@ group example.
 Prebuilt builder and runtime images are published to GHCR. See
 [`docs/docker.md`](docs/docker.md).
 
+## Releases
+
+Releases are cut by [release-please](https://github.com/googleapis/release-please)
+from Conventional Commits. Until the API stabilises, the release PR
+proposes `vX.Y.Z-rc.N` prereleases; merge one to publish that tag.
+Downstream pins explicitly:
+
+```sh
+go get github.com/qvest-digital/go-mxl@v1.0.0-rc.1
+```
+
+To cut a non-prerelease tag, land a commit on `main` with a
+`Release-As: <version>` footer, or drop `versioning-strategy`,
+`prerelease-type`, and `prerelease` from `.release-please-config.json`.
+
 ## Memory safety
 
 Byte slices returned by reads (`Grain.Payload`, `SamplesView` fragments)
