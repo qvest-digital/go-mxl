@@ -54,11 +54,15 @@ jobs:
               # GITHUB_TOKEN and never reach this branch.)
               version=${GITHUB_REF_NAME#v}
             else
-              # Push to main. release-please.yml runs in parallel and
-              # may be tagging this same SHA. Use the merge commit
-              # subject as a cheap filter, then poll for the tag itself
-              # so the version comes from a real git tag — not from
-              # parsing a commit message.
+              # Push to main. `:dev` always tracks main's HEAD, even
+              # when this same commit is also a release commit.
+              builder_tags="${builder_tags},${builder}:dev"
+              runtime_tags="${runtime_tags},${runtime}:dev"
+              # release-please.yml runs in parallel and may be tagging
+              # this same SHA. Use the merge commit subject as a cheap
+              # filter, then poll for the tag itself so the version
+              # comes from a real git tag — not from parsing a commit
+              # message.
               case "$(git log -1 --pretty=%s)" in
                 "chore(main): release "*)
                   for _ in $(seq 1 24); do
@@ -89,9 +93,6 @@ jobs:
                   runtime_tags="${runtime_tags},${runtime}:latest"
                   ;;
               esac
-            else
-              builder_tags="${builder_tags},${builder}:dev"
-              runtime_tags="${runtime_tags},${runtime}:dev"
             fi
           elif [ "$GITHUB_EVENT_NAME" = "pull_request" ] \
               && [ "${{ github.event.pull_request.head.repo.full_name }}" = "${{ github.repository }}" ]; then
