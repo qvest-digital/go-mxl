@@ -184,3 +184,104 @@ jobs:
               go test -count=1 ./...
               go test -count=1 -tags=mxl_integration ./...
             '
+
+  # Native build on Apple Silicon. libmxl ships a Darwin-Clang preset
+  # and brew has every transitive dep (cmake, ninja, libfabric, vcpkg
+  # ports for spdlog/fmt). No docker image is published from this job
+  # — go-mxl is consumed as a Go module on macOS, not as an image.
+  macos:
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Read libmxl pin
+        id: pin
+        run: |
+          set -eu
+          libmxl_url=$(tr -d '[:space:]' < .github/libmxl.version)
+          rest=${libmxl_url#https://github.com/}
+          repo=${rest%%/tree/*}
+          ref=${rest#*/tree/}
+          {
+            echo "clone_url=https://github.com/$repo.git"
+            echo "ref=$ref"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Install build dependencies
+        run: |
+          brew install --quiet cmake ninja pkg-config libfabric
+
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/vcpkg
+            ~/.cache/vcpkg/archives
+          key: vcpkg-macos-arm-${{ hashFiles('.github/libmxl.version') }}
+
+      # See ci.yml's Linux path for the rationale behind --filter=tree:0
+      # vs --depth=1 and pinning vcpkg at $HOME/vcpkg.
+      - name: Bootstrap vcpkg
+        run: |
+          if [ ! -x ~/vcpkg/vcpkg ]; then
+            rm -rf ~/vcpkg
+            git clone --filter=tree:0 https://github.com/microsoft/vcpkg.git ~/vcpkg
+            ~/vcpkg/bootstrap-vcpkg.sh -disableMetrics
+          fi
+
+      - name: Build and install libmxl
+        run: |
+          set -euo pipefail
+          git clone "${{ steps.pin.outputs.clone_url }}" /tmp/mxl
+          git -C /tmp/mxl checkout "${{ steps.pin.outputs.ref }}"
+          sudo mkdir -p /opt/libmxl
+          sudo chown -R "$USER" /opt/libmxl
+          cd /tmp/mxl
+          # The clang preset hard-codes CMAKE_LINKER_TYPE=LLD; macOS's
+          # Xcode toolchain ships its own linker (ld64), so override
+          # back to SYSTEM. BUILD_DOCS=OFF / fabrics-OFI on for parity
+          # with the Linux image.
+          cmake --preset Darwin-Clang-Release \
+                -DBUILD_DOCS=OFF \
+                -DMXL_ENABLE_FABRICS_OFI=ON \
+                -DCMAKE_LINKER_TYPE=SYSTEM \
+                -DCMAKE_INSTALL_PREFIX=/opt/libmxl
+          cmake --build build/Darwin-Clang-Release
+          cmake --install build/Darwin-Clang-Release
+          # vcpkg's spdlog.pc / fmt.pc stay in the build tree; copy
+          # them next to libmxl.pc so pkg-config resolves them off a
+          # single PKG_CONFIG_PATH entry. (Same dance as the Linux
+          # builder image.)
+          cp build/Darwin-Clang-Release/vcpkg_installed/arm64-osx/lib/pkgconfig/*.pc \
+             /opt/libmxl/lib/pkgconfig/
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26'
+
+      - name: Mark workspace as safe git directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: gofmt / vet / build / test
+        env:
+          # libmxl.pc and the copied spdlog.pc/fmt.pc all live here.
+          PKG_CONFIG_PATH: /opt/libmxl/lib/pkgconfig
+          # macOS's dynamic linker uses DYLD_LIBRARY_PATH, not
+          # LD_LIBRARY_PATH.
+          DYLD_LIBRARY_PATH: /opt/libmxl/lib
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then
+            echo "Files need gofmt:"
+            echo "$out"
+            exit 1
+          fi
+          go vet ./...
+          for pkg in $(go list ./...); do
+            echo "Building: $pkg"
+            go build -o /dev/null "$pkg"
+          done
+          # Unit tests only — the mxl_integration suite needs a tmpfs
+          # /dev/shm which macOS doesn't ship by default.
+          go test -count=1 ./...
