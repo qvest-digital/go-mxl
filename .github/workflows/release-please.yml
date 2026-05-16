@@ -7,8 +7,6 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  # workflow_dispatch fired below needs this.
-  actions: write
 
 concurrency:
   group: release-please
@@ -28,15 +26,6 @@ jobs:
           config-file: .github/prerelease-config.json
           manifest-file: .github/prerelease-manifest.json
 
-      # Tag pushes from GITHUB_TOKEN don't fire downstream workflows;
-      # workflow_dispatch does, so re-invoke ci.yml on the new tag to
-      # publish the matching docker images.
-      - name: Dispatch ci.yml on the new tag
-        if: steps.rp.outputs.releases_created == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run ci.yml --ref "${{ steps.rp.outputs.tag_name }}"
-
   # Once a prerelease tag exists, a second pass with the release config
   # opens a follow-up PR proposing the matching final vX.Y.Z. Merging
   # it cuts the stable release; the release config's extra-files entry
@@ -47,14 +36,7 @@ jobs:
     needs: [prerelease]
     if: needs.prerelease.outputs.releases_created == 'true' && contains(needs.prerelease.outputs.tag_name, 'rc')
     steps:
-      - id: rp
-        uses: googleapis/release-please-action@v5
+      - uses: googleapis/release-please-action@v5
         with:
           config-file: .github/release-config.json
           manifest-file: .github/release-manifest.json
-
-      - name: Dispatch ci.yml on the new tag
-        if: steps.rp.outputs.releases_created == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run ci.yml --ref "${{ steps.rp.outputs.tag_name }}"
