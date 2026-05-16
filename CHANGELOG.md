@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0-rc.2](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.1...v1.0.0-rc.2) (2026-05-16)
+
+
+### Continuous Integration
+
+* dispatch ci.yml on the tag release-please creates ([#25](https://github.com/qvest-digital/go-mxl/issues/25)) ([6603900](https://github.com/qvest-digital/go-mxl/commit/660390052b9f262491b70f1959035455c86b475e))
+
 ## [1.0.0-rc.1](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.0...v1.0.0-rc.1) (2026-05-16)
 
 
