@@ -110,17 +110,24 @@ Prebuilt builder and runtime images are published to GHCR. See
 ## Releases
 
 Releases are cut by [release-please](https://github.com/googleapis/release-please)
-from Conventional Commits. Until the API stabilises, the release PR
-proposes `vX.Y.Z-rc.N` prereleases; merge one to publish that tag.
-Downstream pins explicitly:
+from Conventional Commits in two automated stages:
+
+1. Every merge to `main` opens (or updates) a **prerelease PR**
+   proposing the next `vX.Y.Z-rc.N`. Merge it to tag the candidate.
+2. Tagging a prerelease automatically opens a **release PR** for the
+   matching final `vX.Y.Z`. Merge that to graduate.
+
+Both PRs are optional — merge only when you want the corresponding
+tag. Downstream pins either flavour explicitly:
 
 ```sh
 go get github.com/qvest-digital/go-mxl@v1.0.0-rc.1
+go get github.com/qvest-digital/go-mxl@v1.0.0
 ```
 
-To cut a non-prerelease tag, land a commit on `main` with a
-`Release-As: <version>` footer, or drop `versioning-strategy`,
-`prerelease-type`, and `prerelease` from `.release-please-config.json`.
+The two stages are driven by `.github/prerelease-config.json` and
+`.github/release-config.json`; the release config keeps the prerelease
+manifest in sync via `extra-files`.
 
 ## Memory safety
 
