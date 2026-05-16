@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0-rc.3](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.2...v1.0.0-rc.3) (2026-05-16)
+
+
+### Continuous Integration
+
+* detect release tags via git tag --points-at, drop workflow_dispatch ([#26](https://github.com/qvest-digital/go-mxl/issues/26)) ([6ac58da](https://github.com/qvest-digital/go-mxl/commit/6ac58da462008102f057af6a5cd8beb10c51dae0))
+
 ## [1.0.0-rc.2](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.1...v1.0.0-rc.2) (2026-05-16)
 
 
