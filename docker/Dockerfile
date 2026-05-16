@@ -79,7 +79,14 @@ RUN set -eu; \
     # the install prefix so the image is self-contained on a single
     # PKG_CONFIG_PATH entry. spdlog and fmt are statically linked into
     # libmxl{,-fabrics}.so, so the runtime image needs neither.
-    cp build/Linux-Clang-Release/vcpkg_installed/x64-linux/lib/pkgconfig/*.pc \
+    # vcpkg picks the triplet from the host arch (amd64 -> x64-linux,
+    # arm64 -> arm64-linux). buildx populates TARGETARCH for us.
+    case "$TARGETARCH" in \
+      amd64) vcpkg_triplet=x64-linux ;; \
+      arm64) vcpkg_triplet=arm64-linux ;; \
+      *) echo "unsupported TARGETARCH '$TARGETARCH'" >&2; exit 1 ;; \
+    esac; \
+    cp build/Linux-Clang-Release/vcpkg_installed/${vcpkg_triplet}/lib/pkgconfig/*.pc \
        /opt/libmxl/lib/pkgconfig/; \
     rm -rf /tmp/mxl /tmp/libmxl.version
 
