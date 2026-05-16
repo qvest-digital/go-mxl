@@ -5,6 +5,12 @@ on:
     branches: [main]
     tags: ['v*.*.*']
   pull_request:
+  # release-please tags releases with the default GITHUB_TOKEN, whose
+  # push events never trigger downstream workflows. workflow_dispatch
+  # is one of the two event types allowed to fire from GITHUB_TOKEN;
+  # release-please.yml uses it to re-invoke this workflow on the new
+  # tag so the docker images get tagged with :<version> and :pre.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -46,7 +52,7 @@ jobs:
           builder_tags="${builder_image}"
           runtime_tags="${runtime_image}"
           push=false
-          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+          if [ "$GITHUB_EVENT_NAME" = "push" ] || [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
             push=true
             if [ "$GITHUB_REF_TYPE" = "tag" ]; then
               version=${GITHUB_REF_NAME#v}
