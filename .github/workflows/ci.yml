@@ -120,9 +120,10 @@ jobs:
           cache-from: type=gha,scope=go-mxl-images
           cache-to: type=gha,mode=max,scope=go-mxl-images
 
-      - name: gofmt / go vet / go build
+      - name: gofmt / vet / build / test
         run: |
           docker run --rm \
+            --tmpfs /dev/shm:rw,nosuid,size=512m \
             -v "$PWD:/src" -w /src \
             -e GOCACHE=/tmp/gocache -e GOMODCACHE=/tmp/gomodcache \
             "${{ steps.meta.outputs.builder_image }}" \
@@ -134,5 +135,14 @@ jobs:
                 exit 1
               fi
               go vet ./...
-              go build ./...
+              # Build every package, including each examples/<name>/main.go,
+              # under its own go list entry so a broken main shows up with a
+              # clear per-package error. -o /dev/null keeps the workspace
+              # clean across iterations.
+              for pkg in $(go list ./...); do
+                echo "Building: $pkg"
+                go build -o /dev/null "$pkg"
+              done
+              go test -count=1 ./...
+              go test -count=1 -tags=mxl_integration ./...
             '
