@@ -37,12 +37,12 @@ jobs:
           runtime_image="${runtime}:libmxl-${libmxl_short}"
 
           # `push` gates registry writes. Floating tags (`:dev`, `:latest`,
-          # `:<version>`) are reserved for push events on main / release
-          # tags so PR runs cannot clobber them. PR runs from the same
-          # repo still publish the content-addressed `:libmxl-<sha>` tag
-          # so `ci.yml` (and downstream consumers) can pull the exact
-          # image the PR builds. PRs from forks get a read-only token
-          # and skip the push entirely.
+          # `:pre`, `:<version>`) are reserved for push events on main /
+          # release tags so PR runs cannot clobber them. PR runs from
+          # the same repo still publish the content-addressed
+          # `:libmxl-<sha>` tag so `ci.yml` (and downstream consumers)
+          # can pull the exact image the PR builds. PRs from forks get
+          # a read-only token and skip the push entirely.
           builder_tags="${builder_image}"
           runtime_tags="${runtime_image}"
           push=false
@@ -50,8 +50,21 @@ jobs:
             push=true
             if [ "$GITHUB_REF_TYPE" = "tag" ]; then
               version=${GITHUB_REF_NAME#v}
-              builder_tags="${builder_tags},${builder}:${version},${builder}:latest"
-              runtime_tags="${runtime_tags},${runtime}:${version},${runtime}:latest"
+              builder_tags="${builder_tags},${builder}:${version}"
+              runtime_tags="${runtime_tags},${runtime}:${version}"
+              # SemVer prerelease identifiers come after a '-'. Stable
+              # releases get `:latest`; prereleases get `:pre` so that
+              # `:latest` never floats to an unstable build.
+              case "$version" in
+                *-*)
+                  builder_tags="${builder_tags},${builder}:pre"
+                  runtime_tags="${runtime_tags},${runtime}:pre"
+                  ;;
+                *)
+                  builder_tags="${builder_tags},${builder}:latest"
+                  runtime_tags="${runtime_tags},${runtime}:latest"
+                  ;;
+              esac
             else
               builder_tags="${builder_tags},${builder}:dev"
               runtime_tags="${runtime_tags},${runtime}:dev"

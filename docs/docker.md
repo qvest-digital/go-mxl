@@ -10,8 +10,11 @@ Two images are published to GHCR on every push to `main` and on every
 
 ## Tags
 
-- `:latest` — the most recently tagged release.
-- `:<version>` — e.g. `:0.2.0`, for the matching Git tag.
+- `:latest` — the most recently tagged **stable** release.
+- `:pre` — the most recently tagged **prerelease** (e.g. `vX.Y.Z-rc.N`).
+  Never overlaps with `:latest`.
+- `:<version>` — exact version for every Git tag, prerelease or
+  stable (e.g. `:1.0.0`, `:1.0.0-rc.0`).
 - `:dev` — head of `main`.
 - `:libmxl-<shortsha>` — content-addressed tag derived from the libmxl
   revision pinned in [`.github/libmxl.version`](../.github/libmxl.version).
