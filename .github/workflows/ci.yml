@@ -190,7 +190,7 @@ jobs:
   # ports for spdlog/fmt). No docker image is published from this job
   # — go-mxl is consumed as a Go module on macOS, not as an image.
   macos:
-    runs-on: macos-14
+    runs-on: macos-26
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
