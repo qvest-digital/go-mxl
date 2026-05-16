@@ -210,7 +210,10 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          brew install --quiet cmake ninja pkg-config libfabric
+          # gstreamer covers libmxl's bundled gst-* tools (same role as
+          # libgstreamer1.0-dev / libgstreamer-plugins-base1.0-dev on
+          # the Linux builder image).
+          brew install --quiet cmake ninja pkg-config libfabric gstreamer
 
       - name: Cache vcpkg
         uses: actions/cache@v4
