@@ -39,8 +39,10 @@ running an automated assistant against this tree.
 
 - The package is cgo. `libmxl` must be installed with headers and a
   pkg-config file before `go build` works. See `README.md`.
-- Tests that require a running libmxl writer go under build tag
-  `mxl_integration` (when added). Don't gate the unit/vet job on them.
+- Tests that exercise a writer↔reader round-trip live under build tag
+  `mxl_integration` and need a tmpfs-mounted `/dev/shm`. CI runs them
+  in the builder image alongside the unit tests; the build tag keeps
+  them out of a plain `go test ./...` for callers without that mount.
 
 ## When in doubt
 
