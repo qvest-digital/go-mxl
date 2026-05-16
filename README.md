@@ -94,9 +94,13 @@ func main() {
 }
 ```
 
-See [examples/](examples/) for read/write programs covering both
-discrete grain and continuous sample flows, plus a synchronization
-group example.
+## Examples
+
+Small `main` programs exercising each side of the API live under
+[`examples/`](examples/) — local `write-*`/`read-*` pipelines, a
+synchronization-group demo, and a libfabric `fabrics-target` /
+`fabrics-initiator` pair. See [`examples/README.md`](examples/README.md)
+for the canonical command lines.
 
 ## Container images
 
