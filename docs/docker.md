@@ -1,7 +1,9 @@
 # Container images
 
 Two images are published to GHCR on every push to `main` and on every
-`v*.*.*` tag:
+`v*.*.*` tag. Each tag is a multi-arch manifest covering `linux/amd64`
+and `linux/arm64`, so `docker pull` selects the right variant
+automatically (Apple Silicon machines under Docker Desktop included):
 
 | Image | Purpose |
 | --- | --- |
