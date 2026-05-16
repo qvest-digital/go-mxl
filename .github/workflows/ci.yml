@@ -5,12 +5,6 @@ on:
     branches: [main]
     tags: ['v*.*.*']
   pull_request:
-  # release-please tags releases with the default GITHUB_TOKEN, whose
-  # push events never trigger downstream workflows. workflow_dispatch
-  # is one of the two event types allowed to fire from GITHUB_TOKEN;
-  # release-please.yml uses it to re-invoke this workflow on the new
-  # tag so the docker images get tagged with :<version> and :pre.
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -52,10 +46,34 @@ jobs:
           builder_tags="${builder_image}"
           runtime_tags="${runtime_image}"
           push=false
-          if [ "$GITHUB_EVENT_NAME" = "push" ] || [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+          version=""
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             push=true
             if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+              # Manual tag push. (release-please tags are created with
+              # GITHUB_TOKEN and never reach this branch.)
               version=${GITHUB_REF_NAME#v}
+            else
+              # Push to main. release-please.yml runs in parallel and
+              # may be tagging this same SHA. Use the merge commit
+              # subject as a cheap filter, then poll for the tag itself
+              # so the version comes from a real git tag — not from
+              # parsing a commit message.
+              case "$(git log -1 --pretty=%s)" in
+                "chore(main): release "*)
+                  for _ in $(seq 1 24); do
+                    git fetch --tags --quiet origin || true
+                    tag=$(git tag --points-at HEAD --list 'v*' | head -1)
+                    if [ -n "$tag" ]; then
+                      version=${tag#v}
+                      break
+                    fi
+                    sleep 5
+                  done
+                  ;;
+              esac
+            fi
+            if [ -n "$version" ]; then
               builder_tags="${builder_tags},${builder}:${version}"
               runtime_tags="${runtime_tags},${runtime}:${version}"
               # SemVer prerelease identifiers come after a '-'. Stable
