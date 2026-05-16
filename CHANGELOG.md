@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.0.0-rc.1](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.0...v1.0.0-rc.1) (2026-05-16)
+
+
+### Continuous Integration
+
+* **docker:** publish prerelease tags as :pre and :&lt;version&gt; ([#22](https://github.com/qvest-digital/go-mxl/issues/22)) ([e1c7704](https://github.com/qvest-digital/go-mxl/commit/e1c7704b2f7c1a0aefeb405e208d9d1a32f22e75))
+
+
+### Miscellaneous
+
+* **deps:** update debian docker tag to trixie-20260505 ([#8](https://github.com/qvest-digital/go-mxl/issues/8)) ([e330e97](https://github.com/qvest-digital/go-mxl/commit/e330e970babfa8ec61e31145e22775233f9d9f4b))
+* **deps:** update docker/dockerfile docker tag to v1.23 ([#12](https://github.com/qvest-digital/go-mxl/issues/12)) ([4002a05](https://github.com/qvest-digital/go-mxl/commit/4002a05fe3c3a58f86c21d268c13da682d127805))
+
 ## 1.0.0-rc.0 (2026-05-16)
 
 
