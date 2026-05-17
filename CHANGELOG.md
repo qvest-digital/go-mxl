@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0-rc.5](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.4...v1.0.0-rc.5) (2026-05-17)
+
+
+### Build System
+
+* **libmxl:** bump pin to qvest-digital/mxl-dmf-demo@5703b41 ([#36](https://github.com/qvest-digital/go-mxl/issues/36)) ([b1e5011](https://github.com/qvest-digital/go-mxl/commit/b1e50114bc976a6f37c478f75e6fcf04f73f617d))
+
 ## [1.0.0-rc.4](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.3...v1.0.0-rc.4) (2026-05-17)
 
 
