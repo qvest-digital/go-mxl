@@ -20,7 +20,10 @@ ARG DEBIAN_TAG=trixie-20260505
 FROM debian:${DEBIAN_TAG} AS builder
 
 ARG GO_VERSION
-ARG TARGETARCH=amd64
+# buildx auto-populates TARGETARCH (amd64, arm64, …) when a value is
+# not supplied. An explicit default would shadow that, so leave it
+# blank.
+ARG TARGETARCH
 
 # libmxl-fabrics calls fi_fabric2, introduced in libfabric 2.x; trixie
 # ships 2.1 via apt. The gstreamer packages cover libmxl's bundled
@@ -79,14 +82,10 @@ RUN set -eu; \
     # the install prefix so the image is self-contained on a single
     # PKG_CONFIG_PATH entry. spdlog and fmt are statically linked into
     # libmxl{,-fabrics}.so, so the runtime image needs neither.
-    # vcpkg picks the triplet from the host arch (amd64 -> x64-linux,
-    # arm64 -> arm64-linux). buildx populates TARGETARCH for us.
-    case "$TARGETARCH" in \
-      amd64) vcpkg_triplet=x64-linux ;; \
-      arm64) vcpkg_triplet=arm64-linux ;; \
-      *) echo "unsupported TARGETARCH '$TARGETARCH'" >&2; exit 1 ;; \
-    esac; \
-    cp build/Linux-Clang-Release/vcpkg_installed/${vcpkg_triplet}/lib/pkgconfig/*.pc \
+    # vcpkg installs into a single per-host directory under
+    # vcpkg_installed/ (e.g. x64-linux/ on amd64, arm64-linux/ on
+    # arm64); the *-linux/ glob matches it without arch detection.
+    cp build/Linux-Clang-Release/vcpkg_installed/*-linux/lib/pkgconfig/*.pc \
        /opt/libmxl/lib/pkgconfig/; \
     rm -rf /tmp/mxl /tmp/libmxl.version
 
