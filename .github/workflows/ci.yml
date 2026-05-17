@@ -11,21 +11,27 @@ permissions:
   packages: write
 
 jobs:
-  build:
+  # Compute image registry references and tag list once so per-arch
+  # build jobs and the manifest-merge job agree on what to publish.
+  meta:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    outputs:
+      builder: ${{ steps.m.outputs.builder }}
+      runtime: ${{ steps.m.outputs.runtime }}
+      builder_tags: ${{ steps.m.outputs.builder_tags }}
+      runtime_tags: ${{ steps.m.outputs.runtime_tags }}
+      libmxl_url: ${{ steps.m.outputs.libmxl_url }}
+      libmxl_ref: ${{ steps.m.outputs.libmxl_ref }}
+      push: ${{ steps.m.outputs.push }}
     steps:
       - uses: actions/checkout@v6
 
-      - name: Compute image metadata
-        id: meta
+      - id: m
         run: |
           set -eu
           # The pin file holds https://github.com/<owner>/<repo>/tree/<ref>.
-          # Pass the URL through verbatim as a build arg, and derive the
-          # short ref for the content-addressed image tag (`libmxl-<sha>`)
-          # so the image identity tracks the libmxl revision rather than
-          # the go-mxl commit that built it.
+          # Pass the URL through verbatim as a build arg and derive the
+          # short ref for the content-addressed image tag.
           libmxl_url=$(tr -d '[:space:]' < .github/libmxl.version)
           libmxl_ref=${libmxl_url##*/tree/}
           libmxl_short=${libmxl_ref:0:7}
@@ -33,18 +39,8 @@ jobs:
           owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           builder=ghcr.io/${owner}/go-mxl-builder
           runtime=ghcr.io/${owner}/go-mxl-runtime
-          builder_image="${builder}:libmxl-${libmxl_short}"
-          runtime_image="${runtime}:libmxl-${libmxl_short}"
-
-          # `push` gates registry writes. Floating tags (`:dev`, `:latest`,
-          # `:pre`, `:<version>`) are reserved for push events on main /
-          # release tags so PR runs cannot clobber them. PR runs from
-          # the same repo still publish the content-addressed
-          # `:libmxl-<sha>` tag so `ci.yml` (and downstream consumers)
-          # can pull the exact image the PR builds. PRs from forks get
-          # a read-only token and skip the push entirely.
-          builder_tags="${builder_image}"
-          runtime_tags="${runtime_image}"
+          builder_tags="${builder}:libmxl-${libmxl_short}"
+          runtime_tags="${runtime}:libmxl-${libmxl_short}"
           push=false
           version=""
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
@@ -100,63 +96,64 @@ jobs:
           fi
 
           {
-            echo "libmxl_url=${libmxl_url}"
-            echo "libmxl_ref=${libmxl_ref}"
-            echo "builder_image=${builder_image}"
+            echo "builder=${builder}"
+            echo "runtime=${runtime}"
             echo "builder_tags=${builder_tags}"
             echo "runtime_tags=${runtime_tags}"
+            echo "libmxl_url=${libmxl_url}"
+            echo "libmxl_ref=${libmxl_ref}"
             echo "push=${push}"
           } >> "$GITHUB_OUTPUT"
+
+  # Per-arch native build on the matching runner. Each entry pushes a
+  # per-digest image (no tag) and uploads its digest as an artifact so
+  # the merge job can stitch them into a single multi-arch manifest
+  # list per tag. Tests run inside the locally-loaded builder image so
+  # arm64 actually exercises arm64 binaries.
+  build:
+    needs: meta
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runs_on: ubuntu-24.04
+            arch: amd64
+          - platform: linux/arm64
+            runs_on: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runs_on }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
 
       - uses: docker/setup-buildx-action@v4
 
       - name: Log in to GHCR
-        if: steps.meta.outputs.push == 'true'
+        if: needs.meta.outputs.push == 'true'
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # `load: true` puts the image into the runner's docker daemon so
-      # the gofmt/vet/build step below can `docker run` it without a
-      # registry round-trip — and crucially, lets fork PRs (which cannot
-      # push) still exercise the Go toolchain against the freshly-built
-      # libmxl.
-      - name: Build builder image
+      # Always load the builder image locally so the test step below
+      # has something to `docker run`. Tests run on the matrix's native
+      # arch, so on `ubuntu-24.04-arm` they exercise the linux/arm64
+      # libmxl build end-to-end.
+      - name: Build builder (local load)
         uses: docker/build-push-action@v7
         with:
           context: .
           file: docker/Dockerfile
           target: builder
+          platforms: ${{ matrix.platform }}
           load: true
-          push: ${{ steps.meta.outputs.push == 'true' }}
-          tags: ${{ steps.meta.outputs.builder_tags }}
+          tags: local/go-mxl-builder
           build-args: |
-            LIBMXL_VERSION=${{ steps.meta.outputs.libmxl_url }}
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            io.qvest-digital.go-mxl.libmxl-ref=${{ steps.meta.outputs.libmxl_ref }}
-          cache-from: type=gha,scope=go-mxl-images
-          cache-to: type=gha,mode=max,scope=go-mxl-images
-
-      - name: Build runtime image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: docker/Dockerfile
-          target: runtime
-          push: ${{ steps.meta.outputs.push == 'true' }}
-          tags: ${{ steps.meta.outputs.runtime_tags }}
-          build-args: |
-            LIBMXL_VERSION=${{ steps.meta.outputs.libmxl_url }}
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            io.qvest-digital.go-mxl.libmxl-ref=${{ steps.meta.outputs.libmxl_ref }}
-          cache-from: type=gha,scope=go-mxl-images
-          cache-to: type=gha,mode=max,scope=go-mxl-images
+            LIBMXL_VERSION=${{ needs.meta.outputs.libmxl_url }}
+          cache-from: type=gha,scope=builder-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=builder-${{ matrix.arch }}
 
       - name: gofmt / vet / build / test
         run: |
@@ -164,7 +161,7 @@ jobs:
             --tmpfs /dev/shm:rw,nosuid,size=512m \
             -v "$PWD:/src" -w /src \
             -e GOCACHE=/tmp/gocache -e GOMODCACHE=/tmp/gomodcache \
-            "${{ steps.meta.outputs.builder_image }}" \
+            local/go-mxl-builder \
             bash -ec '
               out=$(gofmt -l .)
               if [ -n "$out" ]; then
@@ -173,10 +170,6 @@ jobs:
                 exit 1
               fi
               go vet ./...
-              # Build every package, including each examples/<name>/main.go,
-              # under its own go list entry so a broken main shows up with a
-              # clear per-package error. -o /dev/null keeps the workspace
-              # clean across iterations.
               for pkg in $(go list ./...); do
                 echo "Building: $pkg"
                 go build -o /dev/null "$pkg"
@@ -184,3 +177,117 @@ jobs:
               go test -count=1 ./...
               go test -count=1 -tags=mxl_integration ./...
             '
+
+      # Re-run the builder build with push-by-digest output so the
+      # registry gets a per-arch image identified only by digest. The
+      # gha cache from the load step above keeps this near-instant.
+      - name: Push builder by digest
+        if: needs.meta.outputs.push == 'true'
+        id: builder_push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: builder
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,name=${{ needs.meta.outputs.builder }},push-by-digest=true,name-canonical=true,push=true
+          build-args: |
+            LIBMXL_VERSION=${{ needs.meta.outputs.libmxl_url }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            io.qvest-digital.go-mxl.libmxl-ref=${{ needs.meta.outputs.libmxl_ref }}
+          cache-from: type=gha,scope=builder-${{ matrix.arch }}
+
+      - name: Push runtime by digest
+        if: needs.meta.outputs.push == 'true'
+        id: runtime_push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: runtime
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,name=${{ needs.meta.outputs.runtime }},push-by-digest=true,name-canonical=true,push=true
+          build-args: |
+            LIBMXL_VERSION=${{ needs.meta.outputs.libmxl_url }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            io.qvest-digital.go-mxl.libmxl-ref=${{ needs.meta.outputs.libmxl_ref }}
+          cache-from: type=gha,scope=runtime-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=runtime-${{ matrix.arch }}
+
+      - name: Export digests
+        if: needs.meta.outputs.push == 'true'
+        run: |
+          set -eu
+          mkdir -p "${RUNNER_TEMP}/digests/builder" "${RUNNER_TEMP}/digests/runtime"
+          bd="${{ steps.builder_push.outputs.digest }}"
+          rd="${{ steps.runtime_push.outputs.digest }}"
+          touch "${RUNNER_TEMP}/digests/builder/${bd#sha256:}"
+          touch "${RUNNER_TEMP}/digests/runtime/${rd#sha256:}"
+
+      - name: Upload digests
+        if: needs.meta.outputs.push == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # Stitch the per-arch digests into one multi-arch manifest list per
+  # tag, for both the builder and runtime images.
+  merge:
+    needs: [meta, build]
+    if: needs.meta.outputs.push == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-*
+          # Keep one subdirectory per uploaded artifact so the per-arch
+          # builder/{,runtime} subtrees don't collide.
+          merge-multiple: false
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create manifest lists
+        env:
+          BUILDER: ${{ needs.meta.outputs.builder }}
+          RUNTIME: ${{ needs.meta.outputs.runtime }}
+          BUILDER_TAGS: ${{ needs.meta.outputs.builder_tags }}
+          RUNTIME_TAGS: ${{ needs.meta.outputs.runtime_tags }}
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          set -euo pipefail
+          # Layout: digests-amd64/{builder,runtime}/<digest>, same for arm64.
+          create_manifest() {
+            local image=$1 tags_csv=$2 subdir=$3
+            local tag_args=""
+            local IFS=,
+            for t in $tags_csv; do tag_args="$tag_args -t $t"; done
+            unset IFS
+            local refs=""
+            for f in digests-*/"$subdir"/*; do
+              digest=$(basename "$f")
+              refs="$refs ${image}@sha256:${digest}"
+            done
+            echo "creating $image manifest with tags:$tag_args" >&2
+            # shellcheck disable=SC2086
+            docker buildx imagetools create $tag_args $refs
+          }
+          create_manifest "$BUILDER" "$BUILDER_TAGS" builder
+          create_manifest "$RUNTIME" "$RUNTIME_TAGS" runtime
+
+      - name: Inspect builder manifest
+        run: docker buildx imagetools inspect "$(echo '${{ needs.meta.outputs.builder_tags }}' | cut -d, -f1)"
