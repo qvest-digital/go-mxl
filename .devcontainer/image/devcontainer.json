@@ -1,0 +1,17 @@
+{
+  "name": "go-mxl (published image)",
+  "image": "ghcr.io/qvest-digital/go-mxl-builder:dev",
+  "workspaceFolder": "/src",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/src,type=bind,consistency=cached",
+  // Match what the docker run step in ci.yml provides so the
+  // mxl_integration suite can use /dev/shm as a real tmpfs.
+  "runArgs": ["--tmpfs=/dev/shm:rw,nosuid,size=512m"],
+  "customizations": {
+    "vscode": {
+      "extensions": ["golang.go"],
+      "settings": {
+        "go.buildTags": "mxl_integration"
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "go-mxl (local build)",
+  // Builds the same docker/Dockerfile CI ships, so the resulting
+  // image is identical to what ghcr publishes. context: "../.." sets
+  // the build root to the repo root so `COPY .github/libmxl.version`
+  // resolves the same way it does in CI.
+  "build": {
+    "dockerfile": "../../docker/Dockerfile",
+    "context": "../..",
+    "target": "builder"
+  },
+  "workspaceFolder": "/src",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/src,type=bind,consistency=cached",
+  "runArgs": ["--tmpfs=/dev/shm:rw,nosuid,size=512m"],
+  "customizations": {
+    "vscode": {
+      "extensions": ["golang.go"],
+      "settings": {
+        "go.buildTags": "mxl_integration"
+      }
+    }
+  }
+}
