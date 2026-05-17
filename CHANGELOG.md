@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.0.0-rc.4](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.3...v1.0.0-rc.4) (2026-05-17)
+
+
+### Continuous Integration
+
+* **deps:** update github actions ([#33](https://github.com/qvest-digital/go-mxl/issues/33)) ([3e32a3d](https://github.com/qvest-digital/go-mxl/commit/3e32a3def4d2b509f21e34f549f7ce1acf74d446))
+* **devcontainer:** two configs reusing docker/Dockerfile ([#34](https://github.com/qvest-digital/go-mxl/issues/34)) ([5e6db97](https://github.com/qvest-digital/go-mxl/commit/5e6db970ab61266697dfbf3f1fabfeae2f91dd39))
+* **docker:** always tag main's HEAD with :dev ([#29](https://github.com/qvest-digital/go-mxl/issues/29)) ([472d095](https://github.com/qvest-digital/go-mxl/commit/472d095f67452c62719bd702ea64c15cb60aa66e))
+* matrix build of linux/amd64 + linux/arm64 docker images ([#32](https://github.com/qvest-digital/go-mxl/issues/32)) ([9bd7375](https://github.com/qvest-digital/go-mxl/commit/9bd73757407f50f7e874a2ab03fd928ddccd4a54))
+* **release-please:** include build, ci, chore in release changelog ([#30](https://github.com/qvest-digital/go-mxl/issues/30)) ([3324b90](https://github.com/qvest-digital/go-mxl/commit/3324b90065df1f0c319c499762b1f5bac62f5f9f))
+
+
+### Miscellaneous
+
+* **deps:** update docker/dockerfile docker tag to v1.24 ([#24](https://github.com/qvest-digital/go-mxl/issues/24)) ([e8c7c95](https://github.com/qvest-digital/go-mxl/commit/e8c7c954f03c1158ad3f065c0e91e94c7bc03186))
+
 ## [1.0.0-rc.3](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.2...v1.0.0-rc.3) (2026-05-16)
 
 
