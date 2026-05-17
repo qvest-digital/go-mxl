@@ -52,6 +52,25 @@ The libmxl revision is read from `.github/libmxl.version` inside the
 build context. Pass `--build-arg LIBMXL_VERSION=<github-tree-url>` to
 override.
 
+## Dev containers
+
+`.devcontainer/` ships two configurations that reuse the same
+`docker/Dockerfile` CI publishes. VS Code's "Dev Containers: Reopen
+in Container" shows a picker:
+
+| Config | What it does | When to pick it |
+| --- | --- | --- |
+| `image` | Pulls `ghcr.io/qvest-digital/go-mxl-builder:dev` | Default. Fast start, matches CI exactly. |
+| `local` | Builds the same Dockerfile locally (`target: builder`) | Iterating on the Dockerfile or the libmxl pin without going through CI. |
+
+Both mount the repo at `/src`, pass `--tmpfs=/dev/shm` so the
+`mxl_integration` suite has a real tmpfs, and preinstall the `golang.go`
+extension with `go.buildTags=mxl_integration` so gopls sees the
+integration-tagged sources.
+
+The `image` variant doesn't auto-refresh when CI publishes a new
+`:dev`; run "Dev Containers: Rebuild Container" to pull it.
+
 ## Why trixie-slim and not distroless
 
 `libmxl-fabrics` links against libfabric 2.x. Debian trixie is the
