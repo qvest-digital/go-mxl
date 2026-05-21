@@ -10,7 +10,9 @@
     {
       "customType": "regex",
       "description": "Track tagged releases of dmf-mxl/mxl (or any fork) pinned in .github/libmxl.version",
-      "fileMatch": ["^\\.github/libmxl\\.version$"],
+      "managerFilePatterns": [
+        "/^\\.github/libmxl\\.version$/"
+      ],
       "matchStrings": [
         "^https://github\\.com/(?<depName>[^/]+/[^/]+)/tree/(?<currentValue>[^\\s/]+)\\s*$"
       ],
