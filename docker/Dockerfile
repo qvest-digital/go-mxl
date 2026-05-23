@@ -14,7 +14,7 @@
 # tree URL); pass --build-arg LIBMXL_VERSION=<url> to override.
 
 ARG GO_VERSION=1.26.0
-ARG DEBIAN_TAG=trixie-20260505
+ARG DEBIAN_TAG=trixie-20260518
 
 
 FROM debian:${DEBIAN_TAG} AS builder
