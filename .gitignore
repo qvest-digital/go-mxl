@@ -38,3 +38,9 @@ go.work.sum
 .claude/*
 !.claude/skills/
 !.claude/skills/**
+
+# Local OMC scratch state; keep skills under .omc/skills/
+!.omc/
+.omc/*
+!.omc/skills/
+!.omc/skills/**
