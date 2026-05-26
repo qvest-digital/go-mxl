@@ -115,23 +115,12 @@ gets a changelog entry and how the version bumps. Two consequences:
    or `BREAKING-CHANGE:` (release-please accepts both) and
    `Release-As: X.Y.Z` for explicit overrides.
 
-### Working in a worktree
+### Tearing down a worktree
 
-From the main checkout, create a worktree pinned to a feature
-branch tracking `origin/main`. The worktree lives under
-`.claude/worktrees/`, the project's canonical worktree location,
-and gets a short random tag so two sessions on the same topic
-never share a path:
-
-```sh
-git fetch origin
-id=$(openssl rand -hex 4)
-git worktree add .claude/worktrees/<topic>-$id -b <topic> origin/main
-cd .claude/worktrees/<topic>-$id
-```
-
-When the PR has merged, drop the worktree, the local branch, and
-the now-stale remote tracking ref:
+The `git worktree add` recipe lives in the "STOP. Use a git
+worktree." section above. After the PR has merged, drop the
+worktree, the local branch, and the now-stale remote tracking
+ref:
 
 ```sh
 git worktree remove .claude/worktrees/<topic>-<id>
@@ -139,10 +128,9 @@ git branch -D <topic>
 git fetch --prune origin
 ```
 
-`git worktree remove` is rarely needed when sub-agents manage the
-worktree: the harness cleans up its own `agent-<id>` directories.
-The teardown block above is for the manual `git worktree add`
-case.
+Teardown is only needed for the manual `git worktree add` path;
+sub-agent worktrees under `agent-<id>/` are cleaned up by the
+harness.
 
 ## Commits
 
@@ -151,8 +139,10 @@ case.
   (`feat!:`) or a `BREAKING CHANGE:` footer.
 - Prefer small, focused commits. The release tooling derives version
   bumps and the changelog from commit subjects.
-- Subject line ≤ 72 chars, imperative mood ("add", "fix", not "added",
-  "fixes"). Body wraps at 72.
+- Subject line ≤ 50 chars, imperative mood ("add", "fix", not "added",
+  "fixes") — a local pre-commit hook rejects longer subjects. Body
+  wraps at 72. The PR title (consumed as the squash-merge subject)
+  uses the 72-char cap noted in the squash-format section above.
 
 ### Message content
 
@@ -197,32 +187,59 @@ the work that produced it. The same rules apply to PR descriptions.
 - Releases are automated by `release-please` (see `.github/workflows/`).
   Don't hand-tag or hand-edit `CHANGELOG.md` — let the workflow do it.
 
+## Layout
+
+| Path | Contents |
+| --- | --- |
+| `mxl/` | Go binding for `libmxl` (instance, reader, writer, grain, flowinfo, sync group). The only package downstream importers use. |
+| `fabrics/` | Go binding for `libmxl-fabrics` (libfabric initiator / target endpoints). Separate package because not every libmxl install ships fabrics. |
+| `examples/` | Small `main` programs per API surface — `write-grain`, `read-grain`, `write-samples`, `read-samples`, `sync-group`, `fabrics-target`, `fabrics-initiator`. See `examples/README.md`. |
+| `docker/` | `Dockerfile` for the published builder / runtime images. |
+| `docs/` | Long-form docs that do not belong in `README.md` (currently just `docker.md`). |
+
 ## Build
 
 - The package is cgo. `libmxl` must be installed with headers and a
-  pkg-config file before `go build` works. See `README.md`.
-- Tests that exercise a writer↔reader round-trip live under build tag
-  `mxl_integration` and need a tmpfs-mounted `/dev/shm`. CI runs them
-  in the builder image alongside the unit tests; the build tag keeps
-  them out of a plain `go test ./...` for callers without that mount.
+  pkg-config file before `go build` works. See `README.md` for the
+  `PKG_CONFIG_PATH` / `CGO_LDFLAGS` knobs.
+- Plain unit + vet, no integration tag:
+
+  ```sh
+  go test ./...
+  go vet ./...
+  ```
+
+- Tests that exercise a writer↔reader round-trip live under build
+  tag `mxl_integration` and need a tmpfs-mounted `/dev/shm`. Run
+  them with:
+
+  ```sh
+  go test -tags mxl_integration ./...
+  ```
+
+  CI runs them in the builder image alongside the unit tests; the
+  build tag keeps them out of a plain `go test ./...` for callers
+  without that mount.
 
 ## Graphify
 
-A [Graphify](https://github.com/safishamsi/graphify) knowledge graph
-of this repo lives at `graphify-out/`. The graph is committed, so a
-fresh clone already has it; `.graphifyignore` controls what gets
-indexed. See the "Graphify" section in `README.md` for the install
-and rebuild recipe.
+A committed [Graphify](https://github.com/safishamsi/graphify)
+knowledge graph lives at `graphify-out/`, scoped by
+`.graphifyignore`. The matching Claude Code Skill is tracked at
+`.claude/skills/graphify/`, so a fresh clone has both the graph
+and the assistant integration without any local setup.
 
-When the `graphify` Skill is available in the current Claude session,
-use it before reaching for `grep` / `find` / wide `Read` sweeps:
-query the committed graph to locate symbols, callers, and cross-file
-references, then read only the files the graph points at. The graph
-makes drilling down from a name to its definition, usages, and
-neighbouring types a single query instead of a search-and-prune
-pass. Fall back to `grep` / `find` when the Skill is not loaded or
-when the working tree has drifted past the last committed graph
-(check `graphify-out/GRAPH_REPORT.md` for the indexed snapshot).
+- For codebase questions, prefer `graphify query "<question>"`
+  over wide grep/find sweeps when `graphify-out/graph.json`
+  exists. Use `graphify path "<A>" "<B>"` for relationships and
+  `graphify explain "<concept>"` for focused subgraphs.
+- Read `graphify-out/GRAPH_REPORT.md` only for broad architecture
+  context, not for symbol lookups.
+- After modifying code, run `graphify update .` to keep the graph
+  current. Extraction is AST-only and needs no API key.
+- To re-install the skill / hook in a fresh checkout, run
+  `graphify install --project`; it covers the per-platform
+  `graphify claude install` step in one go.
 
 ## When in doubt
 

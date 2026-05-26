@@ -139,20 +139,15 @@ memory directly. They are only valid until the next read, the matching
 
 ## Graphify
 
-This repo carries a [Graphify](https://github.com/safishamsi/graphify)
-knowledge graph under `graphify-out/`. The graph is committed so a
-fresh clone already has it; `.graphifyignore` controls what gets
-indexed.
+A committed [Graphify](https://github.com/safishamsi/graphify)
+knowledge graph lives at `graphify-out/`, scoped by
+`.graphifyignore`. The matching Claude Code Skill is tracked at
+`.claude/skills/graphify/` so a fresh clone already has both the
+graph and the assistant integration.
 
-Graphify is optional. To rebuild the graph locally, query it, or
-have it auto-rebuild after each commit, install the `graphifyy`
-PyPI package (CLI: `graphify`) and run `graphify hook install`.
-Manage the hook with `graphify hook status` and
-`graphify hook uninstall`.
-
-See the upstream
-[common commands](https://github.com/safishamsi/graphify#common-commands)
-for usage.
+To rebuild after code changes, install the `graphifyy` PyPI package
+(CLI: `graphify`) and run `graphify update .`. See the upstream
+[command reference](https://github.com/safishamsi/graphify#common-commands).
 
 ## License
 
