@@ -3,6 +3,52 @@
 Rules for working in this repository. Read them before opening a PR or
 running an automated assistant against this tree.
 
+## STOP. Use a git worktree.
+
+Before ANY mutation of this repository -- edit, write, commit,
+branch create, push, rebase, `gh pr create` -- the very first
+action of the session is to set up a dedicated `git worktree`.
+This rule has no exceptions. There is no change small enough to
+skip it: typos, single-line fixes, doc-only PRs, even edits to
+this file itself all require the same worktree dance.
+
+The repository is worked on by multiple parallel sessions and
+editors at once. Two writers in the same tree corrupt staging
+state, step on each other's branches, and lose work without
+warning -- the rule exists to make that physically impossible,
+not to be polite about it.
+
+Worktrees ALWAYS live under `<repo>/.claude/worktrees/`. Not
+next to the repo, not in `/tmp`, not anywhere else -- that path
+is the project's established convention and the location the
+harness manages.
+
+The preferred path is to delegate the mutation to a sub-agent
+with `isolation: "worktree"` on the Agent call. The harness
+then creates `<repo>/.claude/worktrees/agent-<id>/` automatically
+with a unique id, so two concurrent sub-agents never share a
+path. Do not assume a worktree from earlier in the session is
+still mounted.
+
+For a manual worktree (no sub-agent), pick a short random tag
+so two sessions on the same topic never collide, and place the
+worktree under `.claude/worktrees/`:
+
+```sh
+git fetch origin
+id=$(openssl rand -hex 4)
+git worktree add .claude/worktrees/<topic>-$id -b <topic> origin/main
+cd .claude/worktrees/<topic>-$id
+```
+
+All subsequent edits, commits, and pushes happen from the
+worktree.
+
+The only thing allowed in the main checkout is read-only
+inspection: `git log`, `git diff`, `git status`, `gh pr view`,
+reading files, grep / find. Anything that touches the index, the
+working tree, the branch list, or the remote is out.
+
 ## Documentation
 
 - Keep `README.md` and code comments tight. State facts; don't speculate.
@@ -27,10 +73,6 @@ running an automated assistant against this tree.
   prohibited. Force-pushing to a feature branch is only permitted
   with explicit approval, because another editor may be reviewing
   the branch or checked out against it.
-- Use a separate `git worktree` per branch when working alongside
-  other editors on the repository. Worktrees keep the main checkout
-  clean while sharing the object database, so parallel sessions do
-  not collide over staged changes or the working tree.
 - Merge PRs with **Squash and merge**. release-please derives version
   bumps and changelog entries from the resulting single commit on
   `main`, and a noisy merge of dozens of intermediate commits would
@@ -73,25 +115,22 @@ gets a changelog entry and how the version bumps. Two consequences:
    or `BREAKING-CHANGE:` (release-please accepts both) and
    `Release-As: X.Y.Z` for explicit overrides.
 
-### Working in a worktree
+### Tearing down a worktree
 
-From the main checkout, create a worktree pinned to a feature
-branch tracking `origin/main`:
-
-```sh
-git fetch origin
-git worktree add ../go-mxl.<topic> -b <topic> origin/main
-cd ../go-mxl.<topic>
-```
-
-When the PR has merged, drop the worktree, the local branch, and
-the now-stale remote tracking ref:
+The `git worktree add` recipe lives in the "STOP. Use a git
+worktree." section above. After the PR has merged, drop the
+worktree, the local branch, and the now-stale remote tracking
+ref:
 
 ```sh
-git worktree remove ../go-mxl.<topic>
+git worktree remove .claude/worktrees/<topic>-<id>
 git branch -D <topic>
 git fetch --prune origin
 ```
+
+Teardown is only needed for the manual `git worktree add` path;
+sub-agent worktrees under `agent-<id>/` are cleaned up by the
+harness.
 
 ## Commits
 
@@ -100,8 +139,10 @@ git fetch --prune origin
   (`feat!:`) or a `BREAKING CHANGE:` footer.
 - Prefer small, focused commits. The release tooling derives version
   bumps and the changelog from commit subjects.
-- Subject line ≤ 72 chars, imperative mood ("add", "fix", not "added",
-  "fixes"). Body wraps at 72.
+- Subject line ≤ 50 chars, imperative mood ("add", "fix", not "added",
+  "fixes") — a local pre-commit hook rejects longer subjects. Body
+  wraps at 72. The PR title (consumed as the squash-merge subject)
+  uses the 72-char cap noted in the squash-format section above.
 
 ### Message content
 
@@ -146,14 +187,59 @@ the work that produced it. The same rules apply to PR descriptions.
 - Releases are automated by `release-please` (see `.github/workflows/`).
   Don't hand-tag or hand-edit `CHANGELOG.md` — let the workflow do it.
 
+## Layout
+
+| Path | Contents |
+| --- | --- |
+| `mxl/` | Go binding for `libmxl` (instance, reader, writer, grain, flowinfo, sync group). The only package downstream importers use. |
+| `fabrics/` | Go binding for `libmxl-fabrics` (libfabric initiator / target endpoints). Separate package because not every libmxl install ships fabrics. |
+| `examples/` | Small `main` programs per API surface — `write-grain`, `read-grain`, `write-samples`, `read-samples`, `sync-group`, `fabrics-target`, `fabrics-initiator`. See `examples/README.md`. |
+| `docker/` | `Dockerfile` for the published builder / runtime images. |
+| `docs/` | Long-form docs that do not belong in `README.md` (currently just `docker.md`). |
+
 ## Build
 
 - The package is cgo. `libmxl` must be installed with headers and a
-  pkg-config file before `go build` works. See `README.md`.
-- Tests that exercise a writer↔reader round-trip live under build tag
-  `mxl_integration` and need a tmpfs-mounted `/dev/shm`. CI runs them
-  in the builder image alongside the unit tests; the build tag keeps
-  them out of a plain `go test ./...` for callers without that mount.
+  pkg-config file before `go build` works. See `README.md` for the
+  `PKG_CONFIG_PATH` / `CGO_LDFLAGS` knobs.
+- Plain unit + vet, no integration tag:
+
+  ```sh
+  go test ./...
+  go vet ./...
+  ```
+
+- Tests that exercise a writer↔reader round-trip live under build
+  tag `mxl_integration` and need a tmpfs-mounted `/dev/shm`. Run
+  them with:
+
+  ```sh
+  go test -tags mxl_integration ./...
+  ```
+
+  CI runs them in the builder image alongside the unit tests; the
+  build tag keeps them out of a plain `go test ./...` for callers
+  without that mount.
+
+## Graphify
+
+A committed [Graphify](https://github.com/safishamsi/graphify)
+knowledge graph lives at `graphify-out/`, scoped by
+`.graphifyignore`. The matching Claude Code Skill is tracked at
+`.claude/skills/graphify/`, so a fresh clone has both the graph
+and the assistant integration without any local setup.
+
+- For codebase questions, prefer `graphify query "<question>"`
+  over wide grep/find sweeps when `graphify-out/graph.json`
+  exists. Use `graphify path "<A>" "<B>"` for relationships and
+  `graphify explain "<concept>"` for focused subgraphs.
+- Read `graphify-out/GRAPH_REPORT.md` only for broad architecture
+  context, not for symbol lookups.
+- After modifying code, run `graphify update .` to keep the graph
+  current. Extraction is AST-only and needs no API key.
+- To re-install the skill / hook in a fresh checkout, run
+  `graphify install --project`; it covers the per-platform
+  `graphify claude install` step in one go.
 
 ## When in doubt
 

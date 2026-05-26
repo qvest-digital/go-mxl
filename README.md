@@ -137,6 +137,18 @@ memory directly. They are only valid until the next read, the matching
 `Commit` / `Cancel`, or the `Reader` / `Writer` being closed. Use
 `Grain.Copy()` or `SamplesView.CopyChannel()` to retain data.
 
+## Graphify
+
+A committed [Graphify](https://github.com/safishamsi/graphify)
+knowledge graph lives at `graphify-out/`, scoped by
+`.graphifyignore`. The matching Claude Code Skill is tracked at
+`.claude/skills/graphify/` so a fresh clone already has both the
+graph and the assistant integration.
+
+To rebuild after code changes, install the `graphifyy` PyPI package
+(CLI: `graphify`) and run `graphify update .`. See the upstream
+[command reference](https://github.com/safishamsi/graphify#common-commands).
+
 ## License
 
 [Apache-2.0](LICENSE)

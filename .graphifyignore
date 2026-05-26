@@ -1,0 +1,27 @@
+# VCS and local worktrees
+.git/
+.claude/worktrees/
+
+# Graphify output and caches
+graphify-out/
+.graphify/
+.graphify-cache/
+
+# Local tool caches and scratch dirs
+.cache/
+.go-build/
+tmp/
+
+# Build and test artifacts
+bin/
+coverage.*
+*.out
+*.coverprofile
+profile.cov
+*.prof
+*.pprof
+*.test
+*.log
+
+# Vendored dependencies
+vendor/
