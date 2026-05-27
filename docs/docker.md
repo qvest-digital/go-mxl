@@ -38,8 +38,10 @@ COPY --from=builder /out/app /usr/local/bin/app
 ENTRYPOINT ["/usr/local/bin/app"]
 ```
 
-The runtime image already sets `LD_LIBRARY_PATH=/opt/libmxl/lib`, so the
-linked `libmxl.so` / `libmxl-fabrics.so` resolve without extra wiring.
+The runtime image sets `LD_LIBRARY_PATH=/opt/libmxl/lib:/opt/amazon/efa/lib`,
+so the linked `libmxl.so` / `libmxl-fabrics.so` and the EFA-capable
+`libfabric.so.1` shipped under `/opt/amazon/efa/lib` resolve without
+extra wiring.
 
 ## Building locally
 
@@ -71,13 +73,37 @@ integration-tagged sources.
 The `image` variant doesn't auto-refresh when CI publishes a new
 `:dev`; run "Dev Containers: Rebuild Container" to pull it.
 
+## Libfabric source
+
+Both stages install libfabric and rdma-core from
+[`aws-efa-installer`](../.github/aws-efa-installer.version) into
+`/opt/amazon/efa/`, not from Debian apt. Debian trixie's
+`libfabric1` 2.1.0-1.1 fails on AWS EFA in two independent ways:
+
+1. **Missing 2.4 read-only-mmap fix.** `fi_mr_regattr` with
+   `FI_WRITE` on a `PROT_READ`-only mapping returns `EFAULT` in
+   `libfabric < 2.4`; libmxl-fabrics hits this path on every
+   reader-side memory region (dmf-mxl/mxl#516).
+2. **No EFA provider.** Debian's `debian/rules` builds libfabric
+   with `--enable-efa` off, and `ibverbs-providers` 61.x in
+   trixie ships drivers for hns/mlx4/mlx5/… but no EFA userspace
+   driver. Inside a Debian-trixie container on an EFA node:
+   `fi_getinfo: provider efa output empty list`.
+
+The `aws-efa-installer` tarball ships native Debian 13 `.deb`s for
+both `x86_64` and `aarch64` with EFA enabled (`libfabric1-aws`) and
+a matching AWS `rdma-core` that includes the EFA userspace
+provider. The installer URL and sha256 are pinned in
+[`.github/aws-efa-installer.version`](../.github/aws-efa-installer.version);
+that file documents the manual bump procedure (AWS publishes no
+release feed Renovate or any other tool can track).
+
 ## Why trixie-slim and not distroless
 
-`libmxl-fabrics` links against libfabric 2.x. Debian trixie is the
-oldest stable distribution that ships libfabric 2 (`libfabric1` v2.1).
-At runtime libfabric `dlopen()`s its provider plugins, which pull a
-handful of transitive shared objects (`libnuma`, `libucx`, `libuv`,
-…). Reaching for trixie-slim and `apt install libfabric1` lets apt's
-dependency solver pick those up; replicating the same set with manual
-`COPY`s from a distroless base is brittle and silently breaks the day
-a new provider lands. The resulting image is still under 200 MB.
+The runtime image is trixie-slim plus the libmxl and
+`aws-efa-installer` `.deb`s. Trixie's apt resolves the handful of
+shared objects the AWS libfabric depends on (`libnuma`, `libuv`,
+libc, libstdc++, …) without manual curation; replicating that set
+with explicit `COPY`s from a distroless base is brittle and breaks
+the day a new provider lands. The resulting image is still under
+200 MB.

@@ -1,0 +1,32 @@
+# Pin for the AWS EFA installer tarball consumed by docker/Dockerfile.
+#
+# Both stages of the image install libfabric and rdma-core from this
+# tarball rather than from Debian apt. Reasons:
+#
+#   1. Debian trixie ships libfabric 2.1; EFA on AWS requires >=2.4
+#      for fi_mr_regattr on PROT_READ-only mappings (dmf-mxl/mxl#516).
+#   2. Debian's libfabric is built with --enable-efa off, and Debian's
+#      ibverbs-providers ships no EFA userspace driver, so the efa
+#      provider is absent regardless of the libfabric version.
+#
+# AWS publishes no machine-readable release feed for the installer:
+# no aws/aws-efa-installer GitHub repo exists, the S3 bucket listing
+# returns 403, there is no latest.txt / VERSION index file, and the
+# release notes are JS-rendered docs. Renovate has nothing to track,
+# so bumps happen manually.
+#
+# Bump procedure:
+#   1. Probe the next version:
+#        curl -sIo /dev/null -w '%{http_code}\n' \
+#          https://efa-installer.amazonaws.com/aws-efa-installer-<N>.tar.gz
+#      Increment patch (1.48.0 -> 1.48.1), then minor, until 403.
+#   2. Download the highest version that returned 200 and compute
+#      its sha256:
+#        curl -fsSL https://efa-installer.amazonaws.com/aws-efa-installer-<N>.tar.gz \
+#          | sha256sum
+#   3. Update both lines below. Open a PR; CI rebuilds both arches.
+#
+# The Dockerfile's parser strips '#'-comment lines, so this header is
+# free-form.
+url=https://efa-installer.amazonaws.com/aws-efa-installer-1.48.0.tar.gz
+sha256=f3a8aadc2b94288694a9b9375bcad84a82f0f843e0eefafda7b158b2200549cc
