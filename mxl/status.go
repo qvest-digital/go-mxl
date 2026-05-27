@@ -5,7 +5,10 @@ package mxl
 */
 import "C"
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // Status mirrors the C mxlStatus enum. The zero value (OK) is success; every
 // other value implements the error interface, so most callers will see Status
@@ -25,6 +28,7 @@ const (
 	StatusErrConflict         Status = C.MXL_ERR_CONFLICT
 	StatusErrPermissionDenied Status = C.MXL_ERR_PERMISSION_DENIED
 	StatusErrFlowInvalid      Status = C.MXL_ERR_FLOW_INVALID
+	StatusErrNotReady         Status = C.MXL_ERR_NOT_READY
 )
 
 // Sentinel errors. Compare with errors.Is. The Status values themselves also
@@ -70,6 +74,8 @@ func (s Status) Error() string {
 		return "mxl: permission denied"
 	case StatusErrFlowInvalid:
 		return "mxl: flow invalid (replaced by writer)"
+	case StatusErrNotReady:
+		return "mxl: not ready"
 	case StatusErrUnknown:
 		return "mxl: unknown error"
 	default:
@@ -77,10 +83,62 @@ func (s Status) Error() string {
 	}
 }
 
-// statusErr converts a C status code to a Go error. OK becomes nil.
-func statusErr(s C.mxlStatus) error {
-	if s == C.MXL_STATUS_OK {
+// known reports whether s is one of the named Status values that Error
+// renders with a specific string. Used by StatusErrFromInt32 to route
+// unknown codes to UnrecognizedStatusError.
+func (s Status) known() bool {
+	switch s {
+	case StatusOK,
+		StatusErrUnknown,
+		StatusErrFlowNotFound,
+		StatusErrOutOfRangeLate,
+		StatusErrOutOfRangeEarly,
+		StatusErrInvalidReader,
+		StatusErrInvalidWriter,
+		StatusErrTimeout,
+		StatusErrInvalidArg,
+		StatusErrConflict,
+		StatusErrPermissionDenied,
+		StatusErrFlowInvalid,
+		StatusErrNotReady:
+		return true
+	}
+	return false
+}
+
+// UnrecognizedStatusError is returned by status conversion when libmxl
+// reports a status code that this binding does not yet name. Status carries
+// the raw integer; Symbol carries a string name when one is known,
+// otherwise empty.
+type UnrecognizedStatusError struct {
+	Status int32
+	Symbol string
+}
+
+func (e *UnrecognizedStatusError) Error() string {
+	if e.Symbol != "" {
+		return fmt.Sprintf("mxl: unrecognized status %d (%s)", e.Status, e.Symbol)
+	}
+	return fmt.Sprintf("mxl: unrecognized status %d", e.Status)
+}
+
+// StatusErrFromInt32 converts a raw libmxl status code to a Go error using
+// the same rules as the internal statusErr. OK becomes nil; named codes
+// return the matching Status; unknown codes return *UnrecognizedStatusError
+// carrying the raw integer. Exported so sibling packages that already hold
+// the status as int32 share one entry point.
+func StatusErrFromInt32(raw int32) error {
+	if Status(raw) == StatusOK {
 		return nil
 	}
-	return Status(s)
+	status := Status(raw)
+	if !status.known() {
+		return &UnrecognizedStatusError{Status: raw}
+	}
+	return status
+}
+
+// statusErr converts a C status code to a Go error. OK becomes nil.
+func statusErr(s C.mxlStatus) error {
+	return StatusErrFromInt32(int32(s))
 }

@@ -65,3 +65,14 @@ func TestErrClosedDistinctFromStatus(t *testing.T) {
 		t.Fatal("ErrClosed must not satisfy errors.As to Status")
 	}
 }
+
+func TestUnrecognizedStatusExposesRawCode(t *testing.T) {
+	err := StatusErrFromInt32(-999)
+	var ue *UnrecognizedStatusError
+	if !errors.As(err, &ue) {
+		t.Fatalf("errors.As to *UnrecognizedStatusError failed: %v", err)
+	}
+	if ue.Status != -999 {
+		t.Fatalf("Status = %d, want -999", ue.Status)
+	}
+}
