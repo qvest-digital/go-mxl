@@ -2,6 +2,11 @@
 #
 # go-mxl builder + runtime base images.
 #
+# - libfabric-stack: Debian trixie with rdma-core and libfabric built
+#   from upstream release tarballs, installed under /opt/libfabric.
+#   Cached independently from builder and runtime — only invalidates
+#   when the RDMA_CORE_VERSION / LIBFABRIC_VERSION ARGs or the base
+#   image change.
 # - builder: Debian trixie with the Go toolchain, clang-19, and libmxl
 #   + libmxl-fabrics installed under /opt/libmxl. Downstream projects
 #   FROM this as their build stage; the libmxl pkg-config files are
@@ -16,14 +21,82 @@
 # libfabric does not come from Debian: trixie ships 2.1, but EFA on
 # AWS needs >=2.4 to register PROT_READ-only memory (dmf-mxl/mxl#516),
 # and Debian's build has --enable-efa off / no EFA ibverbs provider.
-# Both stages install libfabric + rdma-core from aws-efa-installer
-# under /opt/amazon/efa/ instead. The installer URL + sha256 are
-# pinned in .github/aws-efa-installer.version; override with
-# --build-arg AWS_EFA_INSTALLER_URL=<url> (sha256 check is skipped
-# when the URL is overridden).
+# The libfabric-stack stage below builds libfabric and rdma-core from
+# upstream releases instead, so EFA, verbs (all rdma-core providers),
+# tcp, udp, and shm are all compiled in.
 
 ARG GO_VERSION=1.26.0
 ARG DEBIAN_TAG=trixie-20260518
+
+# renovate: datasource=github-releases depName=linux-rdma/rdma-core
+ARG RDMA_CORE_VERSION=v63.0
+# renovate: datasource=github-releases depName=ofiwg/libfabric
+ARG LIBFABRIC_VERSION=v2.5.1
+
+
+# Stage 1: build the full rdma-core + libfabric userspace stack from
+# upstream releases, installed under /opt/libfabric. Cached
+# independently from builder and runtime — only invalidates when the
+# two ARGs above (or the base image) change.
+FROM debian:${DEBIAN_TAG} AS libfabric-stack
+
+ARG RDMA_CORE_VERSION
+ARG LIBFABRIC_VERSION
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      build-essential cmake ninja-build pkg-config \
+      autoconf automake libtool m4 \
+      libnl-3-dev libnl-route-3-dev libudev-dev libsystemd-dev \
+      python3 \
+      curl ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+# rdma-core: ships libibverbs, librdmacm, and the full set of
+# userspace verbs providers (efa, mlx5, mlx4, hns, irdma, siw, rxe,
+# …). All shared, no pyverbs, no man pages.
+RUN set -eu; \
+    v=${RDMA_CORE_VERSION#v}; \
+    curl -fsSL \
+      "https://github.com/linux-rdma/rdma-core/archive/refs/tags/${RDMA_CORE_VERSION}.tar.gz" \
+      | tar -xz -C /tmp; \
+    cd /tmp/rdma-core-${v}; \
+    cmake -B build -G Ninja \
+        -DCMAKE_INSTALL_PREFIX=/opt/libfabric \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DNO_PYVERBS=1 -DNO_MAN_PAGES=1 -DENABLE_STATIC=0; \
+    ninja -C build; \
+    ninja -C build install; \
+    rm -rf /tmp/rdma-core-${v}
+
+# libfabric: stable providers stay at "auto" so they enable themselves
+# when their deps are present (efa + verbs find the rdma-core install
+# above; tcp / udp / shm / sm2 / rxm / rxd have no external deps). The
+# --disable list explicitly turns off vendor providers we have no SDK
+# for and experimental providers we do not want surprise-enabling on a
+# future libfabric bump.
+RUN set -eu; \
+    v=${LIBFABRIC_VERSION#v}; \
+    curl -fsSL \
+      "https://github.com/ofiwg/libfabric/archive/refs/tags/${LIBFABRIC_VERSION}.tar.gz" \
+      | tar -xz -C /tmp; \
+    cd /tmp/libfabric-${v}; \
+    PKG_CONFIG_PATH=/opt/libfabric/lib/pkgconfig \
+    CPPFLAGS=-I/opt/libfabric/include \
+    LDFLAGS="-L/opt/libfabric/lib -Wl,-rpath-link,/opt/libfabric/lib" \
+    ./autogen.sh; \
+    PKG_CONFIG_PATH=/opt/libfabric/lib/pkgconfig \
+    CPPFLAGS=-I/opt/libfabric/include \
+    LDFLAGS="-L/opt/libfabric/lib -Wl,-rpath-link,/opt/libfabric/lib" \
+    ./configure --prefix=/opt/libfabric \
+        --disable-debug --disable-static \
+        --disable-psm2 --disable-psm3 --disable-opx \
+        --disable-usnic --disable-cxi \
+        --disable-mlx --disable-ucx \
+        --disable-mrail --disable-lpp --disable-lnx; \
+    make -j"$(nproc)"; \
+    make install; \
+    rm -rf /tmp/libfabric-${v}
 
 
 FROM debian:${DEBIAN_TAG} AS builder
@@ -34,14 +107,18 @@ ARG GO_VERSION
 # blank.
 ARG TARGETARCH
 
-# gstreamer-dev satisfies libmxl's bundled gstreamer plugin build;
-# the plugin itself is pruned out of the runtime image. libfabric is
-# installed from aws-efa-installer further down, not from apt.
+# gstreamer-dev satisfies libmxl's bundled gstreamer plugin build; the
+# plugin itself is pruned out of the runtime image. libnl/libudev
+# runtime libs are pulled in so the rdma-core .so's COPY'd from
+# libfabric-stack resolve at link time (libmxl-fabrics links against
+# libfabric, which links against librdmacm/libibverbs, which link
+# against libnl).
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       build-essential cmake ninja-build clang-19 lld-19 \
       pkg-config bison flex curl zip unzip tar git ca-certificates \
       libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+      libnl-3-200 libnl-route-3-200 libudev1 \
  && rm -rf /var/lib/apt/lists/* \
  && ln -sf /usr/bin/clang-19    /usr/local/bin/clang \
  && ln -sf /usr/bin/clang++-19  /usr/local/bin/clang++ \
@@ -63,61 +140,23 @@ RUN git clone --filter=tree:0 https://github.com/microsoft/vcpkg.git /root/vcpkg
 ENV VCPKG_ROOT=/root/vcpkg \
     PATH=/root/vcpkg:${PATH}
 
-# aws-efa-installer ships native DEBIAN13 .debs for x86_64 and aarch64.
-# Install libfabric1-aws + libfabric-aws-dev (headers for the
-# libmxl-fabrics cmake build) + libfabric-aws-bin (fi_info for the
-# CI smoke check), plus the matching AWS rdma-core set — the only
-# place the EFA userspace ibverbs provider ships on Debian.
-# Runtime-only .debs are staged under /opt/aws-efa-debs so the
-# runtime stage can COPY+install them without re-downloading the
-# 600+ MB tarball.
-ARG AWS_EFA_INSTALLER_URL=
-COPY .github/aws-efa-installer.version /tmp/aws-efa.version
-RUN set -eu; \
-    if [ -n "$AWS_EFA_INSTALLER_URL" ]; then \
-      url=$AWS_EFA_INSTALLER_URL; sha=; \
-    else \
-      url=$(awk -F= '$1=="url"{print $2}'    /tmp/aws-efa.version); \
-      sha=$(awk -F= '$1=="sha256"{print $2}' /tmp/aws-efa.version); \
-    fi; \
-    case "$TARGETARCH" in \
-      amd64) efa_arch=x86_64 ;; \
-      arm64) efa_arch=aarch64 ;; \
-      *) echo "unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; \
-    esac; \
-    curl -fsSL "$url" -o /tmp/aws-efa.tgz; \
-    if [ -n "$sha" ]; then echo "$sha  /tmp/aws-efa.tgz" | sha256sum -c -; fi; \
-    tar -xzf /tmp/aws-efa.tgz -C /tmp/; \
-    debs=/tmp/aws-efa-installer/DEBS/DEBIAN13/${efa_arch}; \
-    apt-get update; \
-    apt-get install -y --no-install-recommends \
-        "$debs"/libfabric1-aws_*.deb \
-        "$debs"/libfabric-aws-dev_*.deb \
-        "$debs"/libfabric-aws-bin_*.deb \
-        "$debs"/rdma-core/*.deb; \
-    # Stage runtime-only .debs (drop -dev / -utils variants) for the
-    # runtime stage's COPY --from=builder. Open MPI, NCCL plugin,
-    # prrte, pmix, the efa kmod and the libfabric debug build stay
-    # out of both stages.
-    mkdir -p /opt/aws-efa-debs; \
-    cp "$debs"/libfabric1-aws_*.deb /opt/aws-efa-debs/; \
-    cp "$debs"/rdma-core/*.deb      /opt/aws-efa-debs/; \
-    rm -f /opt/aws-efa-debs/*-dev_*.deb \
-          /opt/aws-efa-debs/*-utils_*.deb; \
-    echo /opt/amazon/efa/lib > /etc/ld.so.conf.d/efa.conf; \
-    ldconfig; \
-    rm -rf /var/lib/apt/lists/* \
-           /tmp/aws-efa.tgz /tmp/aws-efa-installer /tmp/aws-efa.version
+# Pull in the rdma-core + libfabric userspace stack from the dedicated
+# build stage. ld.so.conf.d/libfabric.conf wires /opt/libfabric/lib
+# into the dynamic linker search path so libfabric.so.1 resolves
+# without LD_LIBRARY_PATH at link time.
+COPY --from=libfabric-stack /opt/libfabric/ /opt/libfabric/
+RUN echo /opt/libfabric/lib > /etc/ld.so.conf.d/libfabric.conf \
+ && ldconfig
 
-# PKG_CONFIG_PATH must point at AWS's libfabric.pc before the libmxl
-# build below runs cmake (the .pc file is not on the default search
-# path because it lives in /opt/amazon/efa/lib/pkgconfig). The
-# libmxl install populates /opt/libmxl/lib/pkgconfig at the end of
-# its RUN, so prepending that entry now is harmless — pkg-config
-# silently skips non-existent dirs.
-ENV PKG_CONFIG_PATH=/opt/amazon/efa/lib/pkgconfig:/opt/libmxl/lib/pkgconfig \
-    LD_LIBRARY_PATH=/opt/libmxl/lib:/opt/amazon/efa/lib \
-    PATH=/opt/amazon/efa/bin:${PATH}
+# PKG_CONFIG_PATH must point at libfabric.pc before the libmxl build
+# below runs cmake (the .pc file is not on the default search path
+# because it lives in /opt/libfabric/lib/pkgconfig). The libmxl install
+# populates /opt/libmxl/lib/pkgconfig at the end of its RUN, so
+# prepending that entry now is harmless — pkg-config silently skips
+# non-existent dirs.
+ENV PKG_CONFIG_PATH=/opt/libfabric/lib/pkgconfig:/opt/libmxl/lib/pkgconfig \
+    LD_LIBRARY_PATH=/opt/libmxl/lib:/opt/libfabric/lib \
+    PATH=/opt/libfabric/bin:${PATH}
 
 ARG LIBMXL_VERSION=
 COPY .github/libmxl.version /tmp/libmxl.version
@@ -162,28 +201,24 @@ WORKDIR /src
 
 FROM debian:${DEBIAN_TAG}-slim AS runtime
 
-# Debian's libfabric1 used to drag libnuma1/libucx0/libuv1/libstdc++6
-# in as transitive deps; AWS's libfabric1-aws does not, so they are
-# listed explicitly. libucx0 is intentionally omitted — AWS's
-# libfabric build does not link UCX, and the ucx-cma provider is not
-# in scope for EFA.
+# Debian's libfabric1 used to drag libnuma1/libuv1/libstdc++6 in as
+# transitive deps; the upstream-built libfabric does not, so they are
+# listed explicitly. libnl-3-200 / libnl-route-3-200 / libudev1 are
+# the runtime link deps of the rdma-core shared objects COPY'd from
+# libfabric-stack.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       ca-certificates libnuma1 libuv1 libstdc++6 \
+      libnl-3-200 libnl-route-3-200 libudev1 \
  && rm -rf /var/lib/apt/lists/*
 
-# Install AWS libfabric + rdma-core from the .debs staged in the
-# builder. Using `apt-get install -y <path>.deb` (apt 1.1+) so apt
-# resolves intra-tarball deps in one shot. ld.so.conf.d/efa.conf
-# matches what the AWS installer itself writes in the non-container
-# case so /opt/amazon/efa/lib/libfabric.so.1 resolves without
-# LD_LIBRARY_PATH.
-COPY --from=builder /opt/aws-efa-debs/ /opt/aws-efa-debs/
-RUN apt-get update \
- && apt-get install -y --no-install-recommends /opt/aws-efa-debs/*.deb \
- && echo /opt/amazon/efa/lib > /etc/ld.so.conf.d/efa.conf \
- && ldconfig \
- && rm -rf /opt/aws-efa-debs /var/lib/apt/lists/*
+# Pull in the rdma-core + libfabric userspace stack from the dedicated
+# build stage. ld.so.conf.d/libfabric.conf matches what is written in
+# the builder stage so /opt/libfabric/lib/libfabric.so.1 resolves
+# without LD_LIBRARY_PATH.
+COPY --from=libfabric-stack /opt/libfabric/ /opt/libfabric/
+RUN echo /opt/libfabric/lib > /etc/ld.so.conf.d/libfabric.conf \
+ && ldconfig
 
 COPY --from=builder /opt/libmxl/lib/ /opt/libmxl/lib/
 # Drop install-time artefacts (pkg-config, cmake exports) and libmxl's
@@ -194,4 +229,4 @@ RUN rm -rf \
       /opt/libmxl/lib/cmake \
       /opt/libmxl/lib/gstreamer-1.0
 
-ENV LD_LIBRARY_PATH=/opt/libmxl/lib:/opt/amazon/efa/lib
+ENV LD_LIBRARY_PATH=/opt/libmxl/lib:/opt/libfabric/lib

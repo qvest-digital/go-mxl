@@ -1,6 +1,5 @@
-# The Dockerfile only needs the two pin files. Everything else is
+# The Dockerfile only needs the libmxl pin file. Everything else is
 # either irrelevant (Go sources are brought in by downstream consumers)
 # or build-time noise that would invalidate the buildkit cache.
 *
 !.github/libmxl.version
-!.github/aws-efa-installer.version
