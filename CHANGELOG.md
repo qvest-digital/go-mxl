@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0-rc.8](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.7...v1.0.0-rc.8) (2026-05-27)
+
+
+### Bug Fixes
+
+* **docker:** install libibverbs.d under prefix ([#49](https://github.com/qvest-digital/go-mxl/issues/49)) ([f7dacfc](https://github.com/qvest-digital/go-mxl/commit/f7dacfc645a8504e77773a64234d16b6e4e72a55))
+
 ## [1.0.0-rc.7](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.6...v1.0.0-rc.7) (2026-05-27)
 
 
