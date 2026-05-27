@@ -14,3 +14,9 @@ func TestErrNotReadyMatchesMxlStatusErrNotReady(t *testing.T) {
 		t.Fatal("errors.Is(mxl.StatusErrNotReady, fabrics.ErrNotReady) = false")
 	}
 }
+
+func TestErrNotReadyMatchesInverse(t *testing.T) {
+	if !errors.Is(fabrics.ErrNotReady, mxl.StatusErrNotReady) {
+		t.Fatal("errors.Is(fabrics.ErrNotReady, mxl.StatusErrNotReady) = false")
+	}
+}

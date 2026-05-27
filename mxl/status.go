@@ -15,6 +15,25 @@ import (
 // values through the standard error return.
 type Status int32
 
+// statusKinder bridges errors.Is from a Status to sibling-package sentinels
+// (e.g. fabrics.ErrNotReady) without importing those packages. Any error
+// type that maps to a single libmxl Status implements MxlStatus; Status.Is
+// then matches that target when their codes agree.
+type statusKinder interface {
+	MxlStatus() Status
+}
+
+// Is reports whether target identifies the same libmxl status as s. Matches
+// targets that expose a MxlStatus() Status method (typically sibling-package
+// sentinels) so errors.Is reaches them regardless of which side carries the
+// raw Status value.
+func (s Status) Is(target error) bool {
+	if k, ok := target.(statusKinder); ok {
+		return k.MxlStatus() == s
+	}
+	return false
+}
+
 const (
 	StatusOK                  Status = C.MXL_STATUS_OK
 	StatusErrUnknown          Status = C.MXL_ERR_UNKNOWN

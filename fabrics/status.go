@@ -21,6 +21,11 @@ type notReadyError struct{}
 
 func (notReadyError) Error() string { return "mxl/fabrics: not ready" }
 
+// MxlStatus implements the unexported bridge interface in mxl so that
+// errors.Is matches ErrNotReady whenever the chain carries a
+// mxl.StatusErrNotReady value, regardless of direction.
+func (notReadyError) MxlStatus() mxl.Status { return mxl.StatusErrNotReady }
+
 func (notReadyError) Is(target error) bool {
 	if _, ok := target.(notReadyError); ok {
 		return true
