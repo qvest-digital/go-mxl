@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.0-rc.7](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.6...v1.0.0-rc.7) (2026-05-27)
+
+
+### Bug Fixes
+
+* **fabrics:** match mxl.StatusErrNotReady under ErrNotReady ([#46](https://github.com/qvest-digital/go-mxl/issues/46)) ([29f89e4](https://github.com/qvest-digital/go-mxl/commit/29f89e43d50999f39faba3e70adfb1294ca5ec85))
+
+
+### Build System
+
+* **docker:** build libfabric+rdma-core upstream ([#47](https://github.com/qvest-digital/go-mxl/issues/47)) ([ba94687](https://github.com/qvest-digital/go-mxl/commit/ba94687d5d58368f56d3458fb064be2f77085691))
+
 ## [1.0.0-rc.6](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.5...v1.0.0-rc.6) (2026-05-27)
 
 
