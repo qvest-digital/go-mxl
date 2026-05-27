@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.0.0-rc.6](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.5...v1.0.0-rc.6) (2026-05-27)
+
+
+### Build System
+
+* **docker:** ship EFA-capable libfabric from aws-efa-installer ([#43](https://github.com/qvest-digital/go-mxl/issues/43)) ([e9828d0](https://github.com/qvest-digital/go-mxl/commit/e9828d0b42e678bf9da43ad3c9fc026e34711d94))
+
+
+### Miscellaneous
+
+* **config:** migrate config renovate.json ([#39](https://github.com/qvest-digital/go-mxl/issues/39)) ([c9211a8](https://github.com/qvest-digital/go-mxl/commit/c9211a89e1dff772201e2a6c1a12389b4e121389))
+* **deps:** update debian docker tag to trixie-20260518 ([#40](https://github.com/qvest-digital/go-mxl/issues/40)) ([e367bee](https://github.com/qvest-digital/go-mxl/commit/e367bee6443ea5c7e43e456b2275e18254ae8ac2))
+* ignore .omc/ except skills/ ([#42](https://github.com/qvest-digital/go-mxl/issues/42)) ([4efe9c4](https://github.com/qvest-digital/go-mxl/commit/4efe9c457c359070939f56215bdca2abb2d2aaef))
+
 ## [1.0.0-rc.5](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.4...v1.0.0-rc.5) (2026-05-17)
 
 
