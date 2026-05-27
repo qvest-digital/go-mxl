@@ -38,9 +38,9 @@ COPY --from=builder /out/app /usr/local/bin/app
 ENTRYPOINT ["/usr/local/bin/app"]
 ```
 
-The runtime image sets `LD_LIBRARY_PATH=/opt/libmxl/lib:/opt/amazon/efa/lib`,
+The runtime image sets `LD_LIBRARY_PATH=/opt/libmxl/lib:/opt/libfabric/lib`,
 so the linked `libmxl.so` / `libmxl-fabrics.so` and the EFA-capable
-`libfabric.so.1` shipped under `/opt/amazon/efa/lib` resolve without
+`libfabric.so.1` shipped under `/opt/libfabric/lib` resolve without
 extra wiring.
 
 ## Building locally
@@ -73,12 +73,12 @@ integration-tagged sources.
 The `image` variant doesn't auto-refresh when CI publishes a new
 `:dev`; run "Dev Containers: Rebuild Container" to pull it.
 
-## Libfabric source
+## RDMA stack source
 
-Both stages install libfabric and rdma-core from
-[`aws-efa-installer`](../.github/aws-efa-installer.version) into
-`/opt/amazon/efa/`, not from Debian apt. Debian trixie's
-`libfabric1` 2.1.0-1.1 fails on AWS EFA in two independent ways:
+Both stages install libfabric and rdma-core from the upstream
+GitHub release tarballs into `/opt/libfabric/`, not from Debian
+apt. Debian trixie's `libfabric1` 2.1.0-1.1 fails on AWS EFA in
+two independent ways:
 
 1. **Missing 2.4 read-only-mmap fix.** `fi_mr_regattr` with
    `FI_WRITE` on a `PROT_READ`-only mapping returns `EFAULT` in
@@ -90,20 +90,70 @@ Both stages install libfabric and rdma-core from
    driver. Inside a Debian-trixie container on an EFA node:
    `fi_getinfo: provider efa output empty list`.
 
-The `aws-efa-installer` tarball ships native Debian 13 `.deb`s for
-both `x86_64` and `aarch64` with EFA enabled (`libfabric1-aws`) and
-a matching AWS `rdma-core` that includes the EFA userspace
-provider. The installer URL and sha256 are pinned in
-[`.github/aws-efa-installer.version`](../.github/aws-efa-installer.version);
-that file documents the manual bump procedure (AWS publishes no
-release feed Renovate or any other tool can track).
+A dedicated `libfabric-stack` build stage compiles `rdma-core` and
+then `libfabric` from upstream release tarballs. The two versions
+are pinned via `RDMA_CORE_VERSION` and `LIBFABRIC_VERSION` ARGs at
+the top of `docker/Dockerfile`, each annotated with a
+`# renovate: datasource=github-releases` comment so Renovate
+proposes bumps directly against the Dockerfile — no separate pin
+file. Both the builder and runtime stages `COPY --from=libfabric-stack`
+the installed `/opt/libfabric/` tree, so the upstream stack caches
+independently from the libmxl rebuild loop.
+
+## Provider and hardware coverage
+
+The build flags pin the libfabric provider matrix below. Providers
+left at libfabric's `auto` default enable themselves when their
+build-time deps are present; the rdma-core install satisfies the
+verbs deps for every NIC driver the kernel exposes. Vendor and
+experimental providers without an SDK in the image are disabled
+explicitly so a future libfabric bump cannot surprise-enable them.
+
+**Supported**
+
+| libfabric provider | Hardware reached | Kernel-side prereq |
+| --- | --- | --- |
+| `efa` | AWS Elastic Fabric Adapter on EC2 HPC / GPU instance families. | Linux `efa` kernel module (ships with AWS-built AMIs). |
+| `verbs` | NVIDIA / Mellanox ConnectX-3 onward (CX-3, CX-4, CX-4 Lx, CX-5, CX-6, CX-7) and BlueField-1 / -2 / -3 DPUs over InfiniBand or RoCE/v2; Intel E810 iWARP; Intel Omni-Path 100-series HFI1 (verbs fallback path); Broadcom NetXtreme-E RoCE; Chelsio T4 / T5 / T6 iWARP; HiSilicon Kunpeng HiP06 / 07 / 08; Marvell / QLogic FastLinQ; AMD Pensando DSC; Microsoft Azure MANA; Alibaba ERDMA; VMware paravirtual RDMA in ESXi guests; Soft-RoCE (`rxe`) over any Ethernet NIC; Soft-iWARP (`siw`) over any TCP-capable NIC. | Matching in-tree kernel driver: `mlx4_ib`, `mlx5_ib`, `irdma`, `hfi1`, `bnxt_re`, `iw_cxgb4`, `hns_roce`, `qedr`, `ionic_rdma`, `mana_ib`, `erdma`, `vmw_pvrdma`, `rdma_rxe`, `siw`, … (Linux >= 5.x ships them all). |
+| `tcp` | Any IP-capable NIC. Fallback path; no RDMA required. | None. |
+| `udp` | Same as `tcp`, datagram. | None. |
+| `shm`, `sm2` | Intra-host, between processes on the same kernel. | `/dev/shm` writeable. |
+| `rxm`, `rxd` | Utility providers; layer reliable-message or reliable-datagram semantics over an underlying provider (typically `tcp` or `verbs`). Not selected directly; picked up via `FI_PROVIDER=tcp;ofi_rxm` style chaining. | Inherited from the base provider. |
+| Hook providers (`hook_debug`, `hook_hmem`, `dmabuf_peer_mem`, …) | Debug instrumentation + GPU dma-buf integration. Not transports. | None. |
+
+**Not supported in this build**
+
+| libfabric provider compiled out | Hardware this would have reached | Why off |
+| --- | --- | --- |
+| `psm2` | Intel Omni-Path 100 / 200 series via the PSM2 high-performance path. (HFI1 hardware remains reachable through the `verbs` provider — slower than PSM2 but functional.) | psm2 userspace SDK not present; Intel deprecated Omni-Path in 2019. |
+| `psm3` | Intel Ethernet 800 series via PSM3. | psm3 userspace SDK not present. |
+| `opx` | Intel Omni-Path Express (Cornelis CN5000). | OPX SDK not present; niche HPC hardware. |
+| `usnic` | Cisco UCS VIC adapters via the native usNIC interface. (Basic verbs may still bind on some VICs.) | Cisco usnic userspace lib not present. |
+| `cxi` | HPE Cray Slingshot-11 interconnect. | HPE Cassini SDK not present; restricted distribution. |
+| `gni` | Cray Gemini / Aries (pre-Slingshot). | Hardware EOL; SDK not present. |
+| `bgq` | IBM Blue Gene/Q. | Hardware EOL. |
+| `ucx` | Higher-level wrapper over the same NVIDIA/Mellanox cards the `verbs` provider already covers. Useful for DC transport, GPUDirect, richer atomics; not used by libmxl-fabrics today. | The Go binding's `Provider` enum has no `ProviderUCX`; including it would only affect `ProviderAuto`'s registration order. One-line build flag away when libmxl exposes the enum. |
+| `mlx` | Legacy Mellanox MXM (predecessor of UCX). | Deprecated by NVIDIA. |
+| `mrail`, `lnx`, `lpp` | Experimental upstream composite / linked-provider work. | Not stable. |
+
+So in short:
+
+- **All major RDMA NIC vendors with mainline Linux drivers
+  (NVIDIA/Mellanox CX-3 onward, Intel iWARP, Broadcom, Chelsio,
+  HiSilicon, Marvell, AMD Pensando, Azure MANA, Alibaba) plus
+  AWS EFA are supported via `verbs` or `efa`.**
+- **Hardware needing vendor-specific HPC SDKs (Intel Omni-Path
+  PSM2/PSM3/OPX, Cisco usNIC native, HPE Slingshot, Cray
+  Gemini/Aries, IBM BG/Q) is not supported.**
+- **TCP / UDP / SHM fallbacks are always available.**
 
 ## Why trixie-slim and not distroless
 
-The runtime image is trixie-slim plus the libmxl and
-`aws-efa-installer` `.deb`s. Trixie's apt resolves the handful of
-shared objects the AWS libfabric depends on (`libnuma`, `libuv`,
-libc, libstdc++, …) without manual curation; replicating that set
-with explicit `COPY`s from a distroless base is brittle and breaks
-the day a new provider lands. The resulting image is still under
-200 MB.
+The runtime image is trixie-slim plus the libmxl shared objects
+and the `/opt/libfabric/` tree from the `libfabric-stack` stage.
+Trixie's apt resolves the handful of shared objects libfabric and
+rdma-core depend on (`libnuma`, `libuv`, libc, libstdc++,
+`libnl-3`, `libnl-route-3`, `libudev`, …) without manual
+curation; replicating that set with explicit `COPY`s from a
+distroless base is brittle and breaks the day a new provider
+lands. The resulting image is still under 200 MB.

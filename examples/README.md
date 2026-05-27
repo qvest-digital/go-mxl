@@ -58,9 +58,11 @@ read-grain -domain /dev/shm/mxl-tgt -flow <flow-id>
 ```
 
 `-provider` defaults to `tcp`, so the pipeline runs on a single host
-without RDMA hardware. Switch to `verbs`, `efa`, or `shm` when the
-deployment supports it. The published runtime image
-(`ghcr.io/qvest-digital/go-mxl-runtime`) ships libfabric from
-[`aws-efa-installer`](../.github/aws-efa-installer.version) so the
-`efa` provider works on EFA-enabled EC2 nodes out of the box; a
-local builder that uses Debian apt's libfabric instead will not.
+without RDMA hardware. The published runtime image
+(`ghcr.io/qvest-digital/go-mxl-runtime`) ships libfabric and
+rdma-core from upstream releases, so the supported provider set
+out of the box is `efa`, `verbs` (RoCE/v2, InfiniBand, iWARP,
+soft-RoCE), `tcp`, `udp`, and `shm`. See
+[`docs/docker.md`](../docs/docker.md) for the hardware coverage
+matrix. A local builder using Debian apt's libfabric covers only
+`tcp` / `udp` / `shm`.

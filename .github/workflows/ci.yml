@@ -152,8 +152,12 @@ jobs:
           tags: local/go-mxl-builder
           build-args: |
             LIBMXL_VERSION=${{ needs.meta.outputs.libmxl_url }}
-          cache-from: type=gha,scope=builder-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=builder-${{ matrix.arch }}
+          cache-from: |
+            type=gha,scope=libfabric-stack-${{ matrix.arch }}
+            type=gha,scope=builder-${{ matrix.arch }}
+          cache-to: |
+            type=gha,mode=max,scope=libfabric-stack-${{ matrix.arch }}
+            type=gha,mode=max,scope=builder-${{ matrix.arch }}
 
       - name: gofmt / vet / build / test
         run: |
@@ -178,17 +182,20 @@ jobs:
               go test -count=1 -tags=mxl_integration ./...
             '
 
-      # Confirm the builder image actually carries an EFA-capable
-      # libfabric (>=2.4 from aws-efa-installer, not Debians 2.1) and
-      # that the efa provider is compiled in. The provider registers
-      # unconditionally on any libfabric build with EFA support, so
-      # `fi_info -l` lists it even on runners without EFA hardware.
+      # Confirm the builder image carries an EFA-capable libfabric
+      # (>=2.4, not Debian's 2.1) and that the full provider matrix is
+      # compiled in. Providers register unconditionally on a libfabric
+      # build that has them compiled in, so all five appear on a
+      # vanilla GitHub runner with no EFA / no IB / no mlx5 device.
       - name: EFA smoke (builder)
         run: |
           docker run --rm local/go-mxl-builder bash -ec '
             pkg-config --modversion libfabric | grep -E "^2\.[4-9]|^[3-9]"
-            fi_info -l | grep -qE "^efa:"
-            test -e /opt/amazon/efa/lib/libfabric.so.1
+            for p in efa verbs tcp udp shm; do
+              fi_info -l | grep -qE "^${p}:" \
+                || { echo "missing provider: $p"; fi_info -l; exit 1; }
+            done
+            test -e /opt/libfabric/lib/libfabric.so.1
           '
 
       # Build the runtime image locally so the runtime EFA smoke
@@ -206,18 +213,21 @@ jobs:
           tags: local/go-mxl-runtime
           build-args: |
             LIBMXL_VERSION=${{ needs.meta.outputs.libmxl_url }}
-          cache-from: type=gha,scope=runtime-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=runtime-${{ matrix.arch }}
+          cache-from: |
+            type=gha,scope=libfabric-stack-${{ matrix.arch }}
+            type=gha,scope=runtime-${{ matrix.arch }}
+          cache-to: |
+            type=gha,mode=max,scope=libfabric-stack-${{ matrix.arch }}
+            type=gha,mode=max,scope=runtime-${{ matrix.arch }}
 
-      # The runtime image has no fi_info (libfabric-aws-bin is
-      # builder-only), so the smoke confirms the EFA-capable
-      # libfabric and AWS rdma-core .debs are installed and that
-      # ldconfig resolves libfabric.so.1 out of /opt/amazon/efa/lib.
+      # The runtime image has no fi_info (the bin/ tools live only in
+      # the builder), so the smoke confirms the EFA-capable libfabric
+      # is in place by checking that ldconfig resolves libfabric.so.1
+      # out of /opt/libfabric/lib.
       - name: EFA smoke (runtime)
         run: |
           docker run --rm local/go-mxl-runtime bash -ec '
-            ldconfig -p | grep -q "/opt/amazon/efa/lib/libfabric.so.1"
-            dpkg -l libfabric1-aws | grep -q "^ii"
+            ldconfig -p | grep -q "/opt/libfabric/lib/libfabric.so.1"
           '
 
       # Re-run the builder build with push-by-digest output so the
@@ -239,7 +249,9 @@ jobs:
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             io.qvest-digital.go-mxl.libmxl-ref=${{ needs.meta.outputs.libmxl_ref }}
-          cache-from: type=gha,scope=builder-${{ matrix.arch }}
+          cache-from: |
+            type=gha,scope=libfabric-stack-${{ matrix.arch }}
+            type=gha,scope=builder-${{ matrix.arch }}
 
       - name: Push runtime by digest
         if: needs.meta.outputs.push == 'true'
@@ -257,8 +269,12 @@ jobs:
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             io.qvest-digital.go-mxl.libmxl-ref=${{ needs.meta.outputs.libmxl_ref }}
-          cache-from: type=gha,scope=runtime-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=runtime-${{ matrix.arch }}
+          cache-from: |
+            type=gha,scope=libfabric-stack-${{ matrix.arch }}
+            type=gha,scope=runtime-${{ matrix.arch }}
+          cache-to: |
+            type=gha,mode=max,scope=libfabric-stack-${{ matrix.arch }}
+            type=gha,mode=max,scope=runtime-${{ matrix.arch }}
 
       - name: Export digests
         if: needs.meta.outputs.push == 'true'
