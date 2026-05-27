@@ -55,6 +55,16 @@ RUN apt-get update \
 # rdma-core: ships libibverbs, librdmacm, and the full set of
 # userspace verbs providers (efa, mlx5, mlx4, hns, irdma, siw, rxe,
 # …). All shared, no pyverbs, no man pages.
+#
+# CMAKE_INSTALL_SYSCONFDIR is pinned to /opt/libfabric/etc so that
+# rdma-core's CONFIG_DIR (${SYSCONFDIR}/libibverbs.d) and the matching
+# compile-time macro inside libibverbs.so.1 both land inside the
+# /opt/libfabric prefix. Without the override, GNUInstallDirs picks
+# /etc/opt/libfabric for a /opt prefix per FHS, the .driver files
+# install outside the prefix, the single `COPY --from=libfabric-stack
+# /opt/libfabric/ /opt/libfabric/` below misses them, and the runtime
+# verbs provider returns -FI_ENODATA because libibverbs sees no
+# drivers.
 RUN set -eu; \
     v=${RDMA_CORE_VERSION#v}; \
     curl -fsSL \
@@ -63,6 +73,7 @@ RUN set -eu; \
     cd /tmp/rdma-core-${v}; \
     cmake -B build -G Ninja \
         -DCMAKE_INSTALL_PREFIX=/opt/libfabric \
+        -DCMAKE_INSTALL_SYSCONFDIR=/opt/libfabric/etc \
         -DCMAKE_BUILD_TYPE=Release \
         -DNO_PYVERBS=1 -DNO_MAN_PAGES=1 -DENABLE_STATIC=0; \
     ninja -C build; \

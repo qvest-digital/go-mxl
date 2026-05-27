@@ -187,6 +187,11 @@ jobs:
       # compiled in. Providers register unconditionally on a libfabric
       # build that has them compiled in, so all five appear on a
       # vanilla GitHub runner with no EFA / no IB / no mlx5 device.
+      # The final ls check asserts that rdma-core's libibverbs.d/ tree
+      # landed inside the /opt/libfabric prefix with at least one
+      # .driver entry; without it the verbs provider returns
+      # -FI_ENODATA at runtime even though `fi_info -l` shows it
+      # registered.
       - name: EFA smoke (builder)
         run: |
           docker run --rm local/go-mxl-builder bash -ec '
@@ -196,6 +201,8 @@ jobs:
                 || { echo "missing provider: $p"; fi_info -l; exit 1; }
             done
             test -e /opt/libfabric/lib/libfabric.so.1
+            ls /opt/libfabric/etc/libibverbs.d/*.driver >/dev/null \
+              || { echo "libibverbs.d empty or missing"; ls -la /opt/libfabric/etc/libibverbs.d/ 2>&1; exit 1; }
           '
 
       # Build the runtime image locally so the runtime EFA smoke
@@ -223,11 +230,18 @@ jobs:
       # The runtime image has no fi_info (the bin/ tools live only in
       # the builder), so the smoke confirms the EFA-capable libfabric
       # is in place by checking that ldconfig resolves libfabric.so.1
-      # out of /opt/libfabric/lib.
+      # out of /opt/libfabric/lib. The libibverbs.d/ check guards
+      # against the .driver files being absent on the runtime side: a
+      # registered-but-empty verbs provider returns -FI_ENODATA on
+      # real hardware and `fi_info -p verbs` on a runner without
+      # devices is ambiguous, so the discriminator is whether the
+      # config dir is populated.
       - name: EFA smoke (runtime)
         run: |
           docker run --rm local/go-mxl-runtime bash -ec '
             ldconfig -p | grep -q "/opt/libfabric/lib/libfabric.so.1"
+            ls /opt/libfabric/etc/libibverbs.d/*.driver >/dev/null \
+              || { echo "libibverbs.d empty or missing"; ls -la /opt/libfabric/etc/libibverbs.d/ 2>&1; exit 1; }
           '
 
       # Re-run the builder build with push-by-digest output so the
