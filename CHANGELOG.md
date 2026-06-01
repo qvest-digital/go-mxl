@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.0-rc.9](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.8...v1.0.0-rc.9) (2026-06-01)
+
+
+### Features
+
+* **fabrics:** add sample read/transfer methods ([#54](https://github.com/qvest-digital/go-mxl/issues/54)) ([191c94e](https://github.com/qvest-digital/go-mxl/commit/191c94e81fe6040fb9567436406d4004a029477e))
+
+
+### Bug Fixes
+
+* **libmxl:** pin upstream dmf-mxl revision ([#52](https://github.com/qvest-digital/go-mxl/issues/52)) ([464bbb6](https://github.com/qvest-digital/go-mxl/commit/464bbb65b1df73a8d7a402311d96f0fceebd6b95))
+
 ## [1.0.0-rc.8](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.7...v1.0.0-rc.8) (2026-05-27)
 
 
