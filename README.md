@@ -19,6 +19,8 @@ go get github.com/qvest-digital/go-mxl
 The package is a cgo wrapper around libmxl. To build:
 
 - `libmxl` installed with headers and a working `libmxl.pc`
+- `libmxl-fabrics` with its headers and `libmxl-fabrics.pc` to build
+  the `fabrics` package; the core `mxl` package needs only `libmxl`
 - `pkg-config` on `PATH`
 - `cgo` enabled (`CGO_ENABLED=1`, the default for native builds)
 
@@ -26,9 +28,10 @@ Verify with:
 
 ```sh
 pkg-config --cflags --libs libmxl
+pkg-config --cflags --libs libmxl-fabrics  # only for the fabrics package
 ```
 
-If that returns include and link flags, `go build` works without any
+If those return include and link flags, `go build` works without any
 extra environment.
 
 ### Non-default install locations
