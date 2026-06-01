@@ -223,21 +223,24 @@ the work that produced it. The same rules apply to PR descriptions.
 
 ## Graphify
 
-A committed [Graphify](https://github.com/safishamsi/graphify)
-knowledge graph lives at `graphify-out/`, scoped by
-`.graphifyignore`. The matching Claude Code Skill is tracked at
-`.claude/skills/graphify/`, so a fresh clone has both the graph
-and the assistant integration without any local setup.
+The [Graphify](https://github.com/safishamsi/graphify) knowledge
+graph is generated locally and is not committed. `graphify-out/` is
+gitignored because its artifacts embed an absolute, machine-specific
+path (`graphify-out/.graphify_root`), and committing them churned
+dozens of files on every rebuild. Each contributor builds their own
+graph; the matching Claude Code Skill is tracked at
+`.claude/skills/graphify/`, so a fresh clone has the assistant
+integration and only needs one local build.
 
-- For codebase questions, prefer `graphify query "<question>"`
-  over wide grep/find sweeps when `graphify-out/graph.json`
-  exists. Use `graphify path "<A>" "<B>"` for relationships and
+- Build or refresh the graph with `graphify update .`. Extraction is
+  AST-only and needs no API key; `.graphifyignore` scopes it.
+- For codebase questions, prefer `graphify query "<question>"` over
+  wide grep/find sweeps once `graphify-out/graph.json` exists. Use
+  `graphify path "<A>" "<B>"` for relationships and
   `graphify explain "<concept>"` for focused subgraphs.
 - Read `graphify-out/GRAPH_REPORT.md` only for broad architecture
   context, not for symbol lookups.
-- After modifying code, run `graphify update .` to keep the graph
-  current. Extraction is AST-only and needs no API key.
-- To re-install the skill / hook in a fresh checkout, run
+- To install the skill / hook in a fresh checkout, run
   `graphify install --project`; it covers the per-platform
   `graphify claude install` step in one go.
 

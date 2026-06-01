@@ -44,3 +44,9 @@ go.work.sum
 .omc/*
 !.omc/skills/
 !.omc/skills/**
+
+# Graphify knowledge graph: generated locally and not committed.
+# Its artifacts embed an absolute, machine-specific path
+# (graphify-out/.graphify_root) and churn dozens of files on every
+# rebuild. Build it locally with `graphify update .`.
+graphify-out/
