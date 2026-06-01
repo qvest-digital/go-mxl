@@ -77,12 +77,6 @@ func main() {
 	}
 	defer fi.Close()
 
-	regs, err := fabrics.RegionsForFlowReader(r)
-	if err != nil {
-		log.Fatalf("RegionsForFlowReader: %v", err)
-	}
-	defer regs.Close()
-
 	ti, err := fabrics.ParseTargetInfo(string(infoBytes))
 	if err != nil {
 		log.Fatalf("ParseTargetInfo: %v", err)
@@ -98,7 +92,7 @@ func main() {
 	if err := in.Setup(fabrics.InitiatorConfig{
 		Endpoint: fabrics.EndpointAddress{Node: *node, Service: *service},
 		Provider: provider,
-		Regions:  regs,
+		Reader:   r,
 	}); err != nil {
 		log.Fatalf("Initiator.Setup: %v", err)
 	}

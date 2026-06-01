@@ -9,11 +9,6 @@ import (
 func newTestTargetInfo(t *testing.T) *TargetInfo {
 	t.Helper()
 	_, fi, w := newTestFabrics(t)
-	regs, err := RegionsForFlowWriter(w)
-	if err != nil {
-		t.Fatalf("RegionsForFlowWriter: %v", err)
-	}
-	t.Cleanup(func() { regs.Close() })
 	tgt, err := fi.NewTarget()
 	if err != nil {
 		t.Fatalf("NewTarget: %v", err)
@@ -22,7 +17,7 @@ func newTestTargetInfo(t *testing.T) *TargetInfo {
 	info, err := tgt.Setup(TargetConfig{
 		Endpoint: EndpointAddress{Node: "127.0.0.1", Service: "0"},
 		Provider: ProviderTCP,
-		Regions:  regs,
+		Writer:   w,
 	})
 	if err != nil {
 		t.Fatalf("Target.Setup: %v", err)

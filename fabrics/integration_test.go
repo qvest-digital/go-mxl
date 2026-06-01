@@ -108,18 +108,6 @@ func TestFabricsGrainTransferTCP(t *testing.T) {
 	}
 	t.Cleanup(func() { tgtFab.Close() })
 
-	tgtRegs, err := fabrics.RegionsForFlowWriter(tgtWriter)
-	if err != nil {
-		t.Fatalf("RegionsForFlowWriter: %v", err)
-	}
-	t.Cleanup(func() { tgtRegs.Close() })
-
-	srcRegs, err := fabrics.RegionsForFlowReader(srcReader)
-	if err != nil {
-		t.Fatalf("RegionsForFlowReader: %v", err)
-	}
-	t.Cleanup(func() { srcRegs.Close() })
-
 	target, err := tgtFab.NewTarget()
 	if err != nil {
 		t.Fatalf("NewTarget: %v", err)
@@ -132,7 +120,7 @@ func TestFabricsGrainTransferTCP(t *testing.T) {
 	info, err := target.Setup(fabrics.TargetConfig{
 		Endpoint: fabrics.EndpointAddress{Node: "127.0.0.1", Service: targetPort},
 		Provider: fabrics.ProviderTCP,
-		Regions:  tgtRegs,
+		Writer:   tgtWriter,
 	})
 	if err != nil {
 		t.Fatalf("Target.Setup: %v", err)
@@ -147,7 +135,7 @@ func TestFabricsGrainTransferTCP(t *testing.T) {
 	if err := initiator.Setup(fabrics.InitiatorConfig{
 		Endpoint: fabrics.EndpointAddress{Node: "127.0.0.1", Service: initiatorPort},
 		Provider: fabrics.ProviderTCP,
-		Regions:  srcRegs,
+		Reader:   srcReader,
 	}); err != nil {
 		t.Fatalf("Initiator.Setup: %v", err)
 	}
