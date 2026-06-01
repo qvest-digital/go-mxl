@@ -68,12 +68,6 @@ func main() {
 	}
 	defer fi.Close()
 
-	regs, err := fabrics.RegionsForFlowWriter(w)
-	if err != nil {
-		log.Fatalf("RegionsForFlowWriter: %v", err)
-	}
-	defer regs.Close()
-
 	tgt, err := fi.NewTarget()
 	if err != nil {
 		log.Fatalf("NewTarget: %v", err)
@@ -83,7 +77,7 @@ func main() {
 	info, err := tgt.Setup(fabrics.TargetConfig{
 		Endpoint: fabrics.EndpointAddress{Node: *node, Service: *service},
 		Provider: provider,
-		Regions:  regs,
+		Writer:   w,
 	})
 	if err != nil {
 		log.Fatalf("Target.Setup: %v", err)

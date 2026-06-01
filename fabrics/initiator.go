@@ -2,6 +2,7 @@ package fabrics
 
 /*
 #include <stdint.h>
+#include <stdlib.h>
 #include <mxl/fabrics.h>
 */
 import "C"
@@ -10,6 +11,9 @@ import (
 	"runtime"
 	"sync"
 	"time"
+	"unsafe"
+
+	"github.com/qvest-digital/go-mxl/mxl"
 )
 
 // InitiatorConfig configures the local end of a libmxl-fabrics
@@ -22,13 +26,13 @@ type InitiatorConfig struct {
 	// provider used by the targets the initiator will connect to.
 	Provider Provider
 
-	// Regions describes the local shared-memory backing of the flow
-	// being sent. Typically obtained from RegionsForFlowReader.
-	Regions *Regions
+	// Reader is the flow reader whose backing memory is sent to remote
+	// targets. The Initiator pins it for the Initiator lifetime after Setup.
+	Reader *mxl.Reader
 
-	// DeviceSupport requests support for transfers involving device
-	// memory.
-	DeviceSupport bool
+	// Options is a JSON-formatted options string passed through to
+	// libmxl-fabrics. Leave empty for the default options.
+	Options string
 }
 
 // Initiator is a libmxl-fabrics sender. One initiator fans out grain
@@ -36,6 +40,7 @@ type InitiatorConfig struct {
 type Initiator struct {
 	mu     sync.Mutex
 	parent *Instance
+	reader *mxl.Reader
 	handle C.mxlFabricsInitiator
 }
 
@@ -56,35 +61,42 @@ func (i *Instance) NewInitiator() (*Initiator, error) {
 	return in, nil
 }
 
-// Setup binds the endpoint and registers the memory region.
+// Setup binds the endpoint and registers the reader's memory.
 func (in *Initiator) Setup(cfg InitiatorConfig) error {
 	in.mu.Lock()
 	defer in.mu.Unlock()
 	if in.handle == nil {
 		return ErrClosed()
 	}
-	if cfg.Regions == nil {
+	if cfg.Reader == nil {
 		return ErrInvalidArg()
 	}
-
-	cfg.Regions.mu.Lock()
-	defer cfg.Regions.mu.Unlock()
-	if cfg.Regions.handle == nil {
+	h := cfg.Reader.Handle()
+	if h == nil {
 		return ErrClosed()
 	}
 
 	cbuf := cfg.Endpoint.toC()
 	defer cbuf.free()
-
-	cInitCfg := C.mxlFabricsInitiatorConfig{
-		endpointAddress: cbuf.addr,
-		provider:        C.mxlFabricsProvider(cfg.Provider),
-		regions:         cfg.Regions.handle,
-		deviceSupport:   C.bool(cfg.DeviceSupport),
+	var copts *C.char
+	if cfg.Options != "" {
+		copts = C.CString(cfg.Options)
+		defer C.free(unsafe.Pointer(copts))
 	}
 
-	rc := C.mxlFabricsInitiatorSetup(in.handle, &cInitCfg)
-	return fabricsStatusErr(rc)
+	cInitCfg := C.mxlFabricsInitiatorConfig{
+		version:         C.MXL_FABRICS_API_VERSION,
+		endpointAddress: cbuf.addr,
+		provider:        C.mxlFabricsProvider(cfg.Provider),
+		reader:          C.mxlFlowReader(h),
+	}
+
+	rc := C.mxlFabricsInitiatorSetup(in.handle, &cInitCfg, copts)
+	if err := fabricsStatusErr(rc); err != nil {
+		return err
+	}
+	in.reader = cfg.Reader
+	return nil
 }
 
 // AddTarget registers a remote target as a destination for subsequent
@@ -180,6 +192,7 @@ func (in *Initiator) Close() error {
 	}
 	in.handle = nil
 	in.parent = nil
+	in.reader = nil
 	runtime.SetFinalizer(in, nil)
 	return fabricsStatusErr(rc)
 }

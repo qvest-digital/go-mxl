@@ -2,6 +2,7 @@ package fabrics
 
 /*
 #include <stdint.h>
+#include <stdlib.h>
 #include <mxl/fabrics.h>
 */
 import "C"
@@ -10,6 +11,9 @@ import (
 	"runtime"
 	"sync"
 	"time"
+	"unsafe"
+
+	"github.com/qvest-digital/go-mxl/mxl"
 )
 
 // TargetConfig configures the local end of a libmxl-fabrics target —
@@ -21,13 +25,13 @@ type TargetConfig struct {
 	// Provider selects the libmxl-fabrics provider.
 	Provider Provider
 
-	// Regions describes the local shared-memory backing of the flow
-	// being received. Typically obtained from RegionsForFlowWriter.
-	Regions *Regions
+	// Writer is the flow writer whose backing memory receives incoming
+	// transfers. The Target pins it for the Target lifetime after Setup.
+	Writer *mxl.Writer
 
-	// DeviceSupport requests support for transfers involving device
-	// memory (e.g. GPU-direct). Most callers leave this false.
-	DeviceSupport bool
+	// Options is a JSON-formatted options string passed through to
+	// libmxl-fabrics. Leave empty for the default options.
+	Options string
 }
 
 // Target is a libmxl-fabrics receiver. One target accepts grain
@@ -36,6 +40,7 @@ type TargetConfig struct {
 type Target struct {
 	mu     sync.Mutex
 	parent *Instance // pinned for lifetime
+	writer *mxl.Writer
 	handle C.mxlFabricsTarget
 }
 
@@ -56,7 +61,7 @@ func (i *Instance) NewTarget() (*Target, error) {
 	return t, nil
 }
 
-// Setup binds the endpoint, registers the memory region, and returns
+// Setup binds the endpoint, registers the writer's memory, and returns
 // the TargetInfo descriptor that should be transported to remote
 // initiators. The returned TargetInfo is owned by the caller and
 // must be Close'd separately.
@@ -66,30 +71,34 @@ func (t *Target) Setup(cfg TargetConfig) (*TargetInfo, error) {
 	if t.handle == nil {
 		return nil, ErrClosed()
 	}
-	if cfg.Regions == nil {
+	if cfg.Writer == nil {
 		return nil, ErrInvalidArg()
 	}
-
-	cfg.Regions.mu.Lock()
-	defer cfg.Regions.mu.Unlock()
-	if cfg.Regions.handle == nil {
+	h := cfg.Writer.Handle()
+	if h == nil {
 		return nil, ErrClosed()
 	}
 
 	cbuf := cfg.Endpoint.toC()
 	defer cbuf.free()
+	var copts *C.char
+	if cfg.Options != "" {
+		copts = C.CString(cfg.Options)
+		defer C.free(unsafe.Pointer(copts))
+	}
 
 	cTargetCfg := C.mxlFabricsTargetConfig{
+		version:         C.MXL_FABRICS_API_VERSION,
 		endpointAddress: cbuf.addr,
 		provider:        C.mxlFabricsProvider(cfg.Provider),
-		regions:         cfg.Regions.handle,
-		deviceSupport:   C.bool(cfg.DeviceSupport),
+		writer:          C.mxlFlowWriter(h),
 	}
 
 	var info C.mxlFabricsTargetInfo
-	if err := fabricsStatusErr(C.mxlFabricsTargetSetup(t.handle, &cTargetCfg, &info)); err != nil {
+	if err := fabricsStatusErr(C.mxlFabricsTargetSetup(t.handle, &cTargetCfg, copts, &info)); err != nil {
 		return nil, err
 	}
+	t.writer = cfg.Writer
 	ti := &TargetInfo{handle: info}
 	runtime.SetFinalizer(ti, func(x *TargetInfo) { _ = x.Close() })
 	return ti, nil
@@ -143,6 +152,7 @@ func (t *Target) Close() error {
 	}
 	t.handle = nil
 	t.parent = nil
+	t.writer = nil
 	runtime.SetFinalizer(t, nil)
 	return fabricsStatusErr(rc)
 }

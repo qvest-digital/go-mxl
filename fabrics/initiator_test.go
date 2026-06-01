@@ -61,7 +61,7 @@ func TestInitiatorCloseIdempotent(t *testing.T) {
 	}
 }
 
-func TestInitiatorSetupNilRegions(t *testing.T) {
+func TestInitiatorSetupNilReader(t *testing.T) {
 	_, fi, _ := newTestFabrics(t)
 	in, err := fi.NewInitiator()
 	if err != nil {
@@ -71,21 +71,21 @@ func TestInitiatorSetupNilRegions(t *testing.T) {
 	err = in.Setup(InitiatorConfig{
 		Endpoint: EndpointAddress{Node: "127.0.0.1", Service: "0"},
 		Provider: ProviderTCP,
-		Regions:  nil,
+		Reader:   nil,
 	})
 	if !errors.Is(err, mxl.ErrInvalidArg) {
-		t.Fatalf("Setup(nil Regions): %v, want ErrInvalidArg", err)
+		t.Fatalf("Setup(nil Reader): %v, want ErrInvalidArg", err)
 	}
 }
 
-func TestInitiatorSetupClosedRegions(t *testing.T) {
-	_, fi, w := newTestFabrics(t)
-	regs, err := RegionsForFlowWriter(w)
+func TestInitiatorSetupClosedReader(t *testing.T) {
+	parent, fi, _ := newTestFabrics(t)
+	r, err := parent.NewReader("5fbec3b1-1b0f-417d-9059-8b94a47197ed")
 	if err != nil {
-		t.Fatalf("RegionsForFlowWriter: %v", err)
+		t.Fatalf("NewReader: %v", err)
 	}
-	if err := regs.Close(); err != nil {
-		t.Fatalf("Regions.Close: %v", err)
+	if err := r.Close(); err != nil {
+		t.Fatalf("Reader.Close: %v", err)
 	}
 	in, err := fi.NewInitiator()
 	if err != nil {
@@ -95,10 +95,10 @@ func TestInitiatorSetupClosedRegions(t *testing.T) {
 	err = in.Setup(InitiatorConfig{
 		Endpoint: EndpointAddress{Node: "127.0.0.1", Service: "0"},
 		Provider: ProviderTCP,
-		Regions:  regs,
+		Reader:   r,
 	})
 	if !errors.Is(err, mxl.ErrClosed) {
-		t.Fatalf("Setup(closed Regions): %v, want ErrClosed", err)
+		t.Fatalf("Setup(closed Reader): %v, want ErrClosed", err)
 	}
 }
 
@@ -128,11 +128,6 @@ func TestInitiatorAddTargetClosedInfo(t *testing.T) {
 	// Build a TargetInfo via Setup on a separate Target, then close it.
 	parent, fi2, w := newTestFabrics(t)
 	_ = parent
-	regs, err := RegionsForFlowWriter(w)
-	if err != nil {
-		t.Fatalf("RegionsForFlowWriter: %v", err)
-	}
-	t.Cleanup(func() { regs.Close() })
 	tgt, err := fi2.NewTarget()
 	if err != nil {
 		t.Fatalf("NewTarget: %v", err)
@@ -141,7 +136,7 @@ func TestInitiatorAddTargetClosedInfo(t *testing.T) {
 	info, err := tgt.Setup(TargetConfig{
 		Endpoint: EndpointAddress{Node: "127.0.0.1", Service: "0"},
 		Provider: ProviderTCP,
-		Regions:  regs,
+		Writer:   w,
 	})
 	if err != nil {
 		t.Fatalf("Target.Setup: %v", err)
