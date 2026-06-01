@@ -14,6 +14,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -47,33 +48,43 @@ func parseRate(s string) (mxl.Rational, error) {
 }
 
 func main() {
+	if err := run(os.Args[1:], os.Stderr); err != nil && !errors.Is(err, flag.ErrHelp) {
+		log.Fatal(err)
+	}
+}
+
+func run(args []string, stderr io.Writer) error {
+	fs := flag.NewFlagSet("sync-group", flag.ContinueOnError)
+	fs.SetOutput(stderr)
 	var (
-		domain  = flag.String("domain", "/dev/shm/mxl", "MXL domain directory (tmpfs)")
-		rateStr = flag.String("rate", "30000/1001", "Grain/sample rate as N/D")
-		timeout = flag.Duration("timeout", 500*time.Millisecond, "Per-tick wait timeout")
-		count   = flag.Int64("count", 0, "Stop after N successful ticks (0 = forever)")
+		domain  = fs.String("domain", "/dev/shm/mxl", "MXL domain directory (tmpfs)")
+		rateStr = fs.String("rate", "30000/1001", "Grain/sample rate as N/D")
+		timeout = fs.Duration("timeout", 500*time.Millisecond, "Per-tick wait timeout")
+		count   = fs.Int64("count", 0, "Stop after N successful ticks (0 = forever)")
 	)
 	var flows flowList
-	flag.Var(&flows, "flow", "Flow UUID to synchronize on (repeat)")
-	flag.Parse()
+	fs.Var(&flows, "flow", "Flow UUID to synchronize on (repeat)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
 
 	if len(flows) == 0 {
-		log.Fatalf("at least one -flow <uuid> is required")
+		return errors.New("at least one -flow <uuid> is required")
 	}
 	rate, err := parseRate(*rateStr)
 	if err != nil {
-		log.Fatalf("parse -rate: %v", err)
+		return fmt.Errorf("parse -rate: %w", err)
 	}
 
 	inst, err := mxl.NewInstance(*domain, "")
 	if err != nil {
-		log.Fatalf("NewInstance: %v", err)
+		return fmt.Errorf("NewInstance: %w", err)
 	}
 	defer inst.Close()
 
 	group, err := inst.NewSyncGroup()
 	if err != nil {
-		log.Fatalf("NewSyncGroup: %v", err)
+		return fmt.Errorf("NewSyncGroup: %w", err)
 	}
 	defer group.Close()
 
@@ -81,11 +92,11 @@ func main() {
 	for _, id := range flows {
 		r, err := inst.NewReader(id)
 		if err != nil {
-			log.Fatalf("NewReader(%s): %v", id, err)
+			return fmt.Errorf("NewReader(%s): %w", id, err)
 		}
 		defer r.Close()
 		if err := group.AddReader(r); err != nil {
-			log.Fatalf("AddReader(%s): %v", id, err)
+			return fmt.Errorf("AddReader(%s): %w", id, err)
 		}
 		readers = append(readers, r)
 	}
@@ -99,7 +110,7 @@ func main() {
 		select {
 		case <-stop:
 			log.Printf("stopping after %d ticks", ticks)
-			return
+			return nil
 		default:
 		}
 
@@ -111,7 +122,7 @@ func main() {
 			ticks++
 			if *count > 0 && ticks >= *count {
 				log.Printf("done: %d ticks", ticks)
-				return
+				return nil
 			}
 			idx++
 		case errors.Is(err, mxl.ErrTimeout), errors.Is(err, mxl.ErrOutOfRangeEarly):
@@ -122,7 +133,7 @@ func main() {
 			log.Printf("fell behind at idx=%d, resyncing", idx)
 			idx = mxl.CurrentIndex(rate)
 		default:
-			log.Fatalf("WaitForDataAt: %v", err)
+			return fmt.Errorf("WaitForDataAt: %w", err)
 		}
 	}
 }

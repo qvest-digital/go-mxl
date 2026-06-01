@@ -16,6 +16,8 @@ package main
 import (
 	"errors"
 	"flag"
+	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -27,65 +29,75 @@ import (
 )
 
 func main() {
+	if err := run(os.Args[1:], os.Stderr); err != nil && !errors.Is(err, flag.ErrHelp) {
+		log.Fatal(err)
+	}
+}
+
+func run(args []string, stderr io.Writer) error {
+	fs := flag.NewFlagSet("fabrics-initiator", flag.ContinueOnError)
+	fs.SetOutput(stderr)
 	var (
-		domain     = flag.String("domain", "/dev/shm/mxl-src", "MXL domain directory (tmpfs)")
-		flowID     = flag.String("flow", "", "Flow UUID to forward")
-		providerS  = flag.String("provider", "tcp", "libmxl-fabrics provider (tcp|verbs|efa|shm)")
-		node       = flag.String("node", "127.0.0.1", "Local endpoint address")
-		service    = flag.String("service", "23457", "Local endpoint port/service")
-		targetFile = flag.String("target-info", "target.info", "Path to read the TargetInfo from")
-		count      = flag.Int64("count", 0, "Stop after N transfers (0 = run forever)")
-		poll       = flag.Duration("poll", 50*time.Millisecond, "MakeProgress interval")
+		domain     = fs.String("domain", "/dev/shm/mxl-src", "MXL domain directory (tmpfs)")
+		flowID     = fs.String("flow", "", "Flow UUID to forward")
+		providerS  = fs.String("provider", "tcp", "libmxl-fabrics provider (tcp|verbs|efa|shm)")
+		node       = fs.String("node", "127.0.0.1", "Local endpoint address")
+		service    = fs.String("service", "23457", "Local endpoint port/service")
+		targetFile = fs.String("target-info", "target.info", "Path to read the TargetInfo from")
+		count      = fs.Int64("count", 0, "Stop after N transfers (0 = run forever)")
+		poll       = fs.Duration("poll", 50*time.Millisecond, "MakeProgress interval")
 	)
-	flag.Parse()
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
 
 	if *flowID == "" {
-		log.Fatalf("missing -flow <uuid>")
+		return errors.New("missing -flow <uuid>")
 	}
 	provider, err := fabrics.ParseProvider(*providerS)
 	if err != nil {
-		log.Fatalf("parse -provider %q: %v", *providerS, err)
+		return fmt.Errorf("parse -provider %q: %w", *providerS, err)
 	}
 	infoBytes, err := os.ReadFile(*targetFile)
 	if err != nil {
-		log.Fatalf("read %s: %v", *targetFile, err)
+		return fmt.Errorf("read %s: %w", *targetFile, err)
 	}
 
 	inst, err := mxl.NewInstance(*domain, "")
 	if err != nil {
-		log.Fatalf("mxl.NewInstance: %v", err)
+		return fmt.Errorf("mxl.NewInstance: %w", err)
 	}
 	defer inst.Close()
 
 	r, err := inst.NewReader(*flowID)
 	if err != nil {
-		log.Fatalf("NewReader: %v", err)
+		return fmt.Errorf("NewReader: %w", err)
 	}
 	defer r.Close()
 
 	info, err := r.Info()
 	if err != nil {
-		log.Fatalf("Info: %v", err)
+		return fmt.Errorf("Info: %w", err)
 	}
 	if !info.Config.Common.Format.IsDiscrete() {
-		log.Fatalf("flow %s is not discrete; fabrics-initiator only forwards discrete flows", *flowID)
+		return fmt.Errorf("flow %s is not discrete; fabrics-initiator only forwards discrete flows", *flowID)
 	}
 
 	fi, err := fabrics.NewInstance(inst)
 	if err != nil {
-		log.Fatalf("fabrics.NewInstance: %v", err)
+		return fmt.Errorf("fabrics.NewInstance: %w", err)
 	}
 	defer fi.Close()
 
 	ti, err := fabrics.ParseTargetInfo(string(infoBytes))
 	if err != nil {
-		log.Fatalf("ParseTargetInfo: %v", err)
+		return fmt.Errorf("ParseTargetInfo: %w", err)
 	}
 	defer ti.Close()
 
 	in, err := fi.NewInitiator()
 	if err != nil {
-		log.Fatalf("NewInitiator: %v", err)
+		return fmt.Errorf("NewInitiator: %w", err)
 	}
 	defer in.Close()
 
@@ -94,10 +106,10 @@ func main() {
 		Provider: provider,
 		Reader:   r,
 	}); err != nil {
-		log.Fatalf("Initiator.Setup: %v", err)
+		return fmt.Errorf("Initiator.Setup: %w", err)
 	}
 	if err := in.AddTarget(ti); err != nil {
-		log.Fatalf("AddTarget: %v", err)
+		return fmt.Errorf("AddTarget: %w", err)
 	}
 
 	stop := make(chan os.Signal, 1)
@@ -110,7 +122,7 @@ func main() {
 		select {
 		case <-stop:
 			log.Printf("stopping after %d transfers", sent)
-			return
+			return nil
 		default:
 		}
 
@@ -119,27 +131,27 @@ func main() {
 		switch {
 		case err == nil:
 			if err := in.TransferGrain(g.Index, 0, g.TotalSlices); err != nil {
-				log.Fatalf("TransferGrain(%d): %v", g.Index, err)
+				return fmt.Errorf("TransferGrain(%d): %w", g.Index, err)
 			}
 			if err := in.MakeProgress(*poll); err != nil && !errors.Is(err, fabrics.ErrNotReady) {
-				log.Fatalf("MakeProgress: %v", err)
+				return fmt.Errorf("MakeProgress: %w", err)
 			}
 			sent++
 			if *count > 0 && sent >= *count {
 				log.Printf("done: %d transfers", sent)
-				return
+				return nil
 			}
 			idx++
 		case errors.Is(err, mxl.ErrTimeout), errors.Is(err, mxl.ErrOutOfRangeEarly):
 			// Source not caught up yet; drive progress and retry.
 			if err := in.MakeProgressNonBlocking(); err != nil && !errors.Is(err, fabrics.ErrNotReady) {
-				log.Fatalf("MakeProgressNonBlocking: %v", err)
+				return fmt.Errorf("MakeProgressNonBlocking: %w", err)
 			}
 		case errors.Is(err, mxl.ErrOutOfRangeLate):
 			log.Printf("fell behind at idx=%d, resyncing", idx)
 			idx = mxl.CurrentIndex(rate)
 		default:
-			log.Fatalf("GetGrain: %v", err)
+			return fmt.Errorf("GetGrain: %w", err)
 		}
 	}
 }
