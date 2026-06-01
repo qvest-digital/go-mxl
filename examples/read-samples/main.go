@@ -12,6 +12,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -22,53 +23,70 @@ import (
 )
 
 func main() {
-	var (
-		domain = flag.String("domain", "/dev/shm/mxl", "MXL domain directory (tmpfs)")
-		flowID = flag.String("flow", "", "Flow UUID to read")
-		// Keep the timeout small relative to the ring buffer's live window
-		// (bufferLength/2 - count). For 48 kHz with a 480-sample batch and
-		// a 19456-sample buffer the window is ~190 ms; if GetSamples waits
-		// longer than that, head can race past our requested index and
-		// the post-wait re-evaluation returns ErrOutOfRangeLate instead
-		// of OK. ~2× the batch period is a safe choice.
-		timeout = flag.Duration("timeout", 20*time.Millisecond, "Per-batch read timeout")
-		count   = flag.Int64("count", 0, "Stop after N batches (0 = run forever)")
-		batch   = flag.Int("batch", 0, "Samples per batch (0 = ~10 ms)")
-	)
-	flag.Parse()
+	if err := run(os.Args[1:], os.Stderr); err != nil && !errors.Is(err, flag.ErrHelp) {
+		log.Fatal(err)
+	}
+}
 
-	if *flowID == "" {
-		log.Fatalf("missing -flow <uuid>")
-	}
-
-	inst, err := mxl.NewInstance(*domain, "")
-	if err != nil {
-		log.Fatalf("NewInstance: %v", err)
-	}
-	defer inst.Close()
-
-	r, err := inst.NewReader(*flowID)
-	if err != nil {
-		log.Fatalf("NewReader: %v", err)
-	}
-	defer r.Close()
-
-	info, err := r.Info()
-	if err != nil {
-		log.Fatalf("Info: %v", err)
-	}
-	if info.Config.Common.Format.IsDiscrete() {
-		log.Fatalf("flow %s is discrete; use read-grain", *flowID)
-	}
-	cfg := info.Config
-	rate := cfg.Common.GrainRate
-	bs := uint64(*batch)
+// defaultBatch returns the per-batch sample count: override when > 0, else
+// ~10 ms of audio at rate, clamped to at least one sample.
+func defaultBatch(rate mxl.Rational, override int) uint64 {
+	bs := uint64(override)
 	if bs == 0 {
 		bs = uint64(rate.Num / (100 * rate.Den))
 		if bs == 0 {
 			bs = 1
 		}
 	}
+	return bs
+}
+
+func run(args []string, stderr io.Writer) error {
+	fs := flag.NewFlagSet("read-samples", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	var (
+		domain = fs.String("domain", "/dev/shm/mxl", "MXL domain directory (tmpfs)")
+		flowID = fs.String("flow", "", "Flow UUID to read")
+		// Keep the timeout small relative to the ring buffer's live window
+		// (bufferLength/2 - count). For 48 kHz with a 480-sample batch and
+		// a 19456-sample buffer the window is ~190 ms; if GetSamples waits
+		// longer than that, head can race past our requested index and
+		// the post-wait re-evaluation returns ErrOutOfRangeLate instead
+		// of OK. ~2× the batch period is a safe choice.
+		timeout = fs.Duration("timeout", 20*time.Millisecond, "Per-batch read timeout")
+		count   = fs.Int64("count", 0, "Stop after N batches (0 = run forever)")
+		batch   = fs.Int("batch", 0, "Samples per batch (0 = ~10 ms)")
+	)
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	if *flowID == "" {
+		return errors.New("missing -flow <uuid>")
+	}
+
+	inst, err := mxl.NewInstance(*domain, "")
+	if err != nil {
+		return fmt.Errorf("NewInstance: %w", err)
+	}
+	defer inst.Close()
+
+	r, err := inst.NewReader(*flowID)
+	if err != nil {
+		return fmt.Errorf("NewReader: %w", err)
+	}
+	defer r.Close()
+
+	info, err := r.Info()
+	if err != nil {
+		return fmt.Errorf("Info: %w", err)
+	}
+	if info.Config.Common.Format.IsDiscrete() {
+		return fmt.Errorf("flow %s is discrete; use read-grain", *flowID)
+	}
+	cfg := info.Config
+	rate := cfg.Common.GrainRate
+	bs := defaultBatch(rate, *batch)
 	max, _ := r.GetMaxReadLengthSamples()
 	log.Printf("flow channels=%d bufferLen=%d sampleRate=%d/%d batch=%d max=%d",
 		cfg.Continuous.ChannelCount, cfg.Continuous.BufferLength,
@@ -84,7 +102,7 @@ func main() {
 	// off the back of the ring — yielding TOO_LATE in a livelock loop.
 	idx := info.Runtime.HeadIndex
 	if idx == 0 {
-		log.Fatalf("flow has no head yet (no producer?)")
+		return errors.New("flow has no head yet (no producer?)")
 	}
 
 	var seen int64
@@ -92,7 +110,7 @@ func main() {
 		select {
 		case <-stop:
 			log.Printf("stopping after %d batches", seen)
-			return
+			return nil
 		default:
 		}
 
@@ -105,7 +123,7 @@ func main() {
 			seen++
 			if *count > 0 && seen >= *count {
 				log.Printf("done: %d batches", seen)
-				return
+				return nil
 			}
 		case errors.Is(err, mxl.ErrOutOfRangeEarly):
 			// Writer hasn't reached idx yet; the blocking GetSamples already
@@ -116,12 +134,12 @@ func main() {
 			// the current head to resume.
 			rt, rerr := r.Runtime()
 			if rerr != nil {
-				log.Fatalf("Runtime: %v", rerr)
+				return fmt.Errorf("Runtime: %w", rerr)
 			}
 			log.Printf("fell behind (idx=%d head=%d), resyncing", idx, rt.HeadIndex)
 			idx = rt.HeadIndex
 		default:
-			log.Fatalf("GetSamples: %v", err)
+			return fmt.Errorf("GetSamples: %w", err)
 		}
 	}
 }

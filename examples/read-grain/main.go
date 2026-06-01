@@ -12,6 +12,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -22,16 +23,26 @@ import (
 )
 
 func main() {
+	if err := run(os.Args[1:], os.Stderr); err != nil && !errors.Is(err, flag.ErrHelp) {
+		log.Fatal(err)
+	}
+}
+
+func run(args []string, stderr io.Writer) error {
+	fs := flag.NewFlagSet("read-grain", flag.ContinueOnError)
+	fs.SetOutput(stderr)
 	var (
-		domain  = flag.String("domain", "/dev/shm/mxl", "MXL domain directory (tmpfs)")
-		flowID  = flag.String("flow", "", "Flow UUID to read")
-		timeout = flag.Duration("timeout", 200*time.Millisecond, "Per-grain read timeout")
-		count   = flag.Int("count", 0, "Stop after N grains (0 = run forever)")
+		domain  = fs.String("domain", "/dev/shm/mxl", "MXL domain directory (tmpfs)")
+		flowID  = fs.String("flow", "", "Flow UUID to read")
+		timeout = fs.Duration("timeout", 200*time.Millisecond, "Per-grain read timeout")
+		count   = fs.Int("count", 0, "Stop after N grains (0 = run forever)")
 	)
-	flag.Parse()
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
 
 	if *flowID == "" {
-		log.Fatalf("missing -flow <uuid>")
+		return errors.New("missing -flow <uuid>")
 	}
 
 	ver, err := mxl.LibVersion()
@@ -46,19 +57,19 @@ func main() {
 
 	inst, err := mxl.NewInstance(*domain, "")
 	if err != nil {
-		log.Fatalf("NewInstance: %v", err)
+		return fmt.Errorf("NewInstance: %w", err)
 	}
 	defer inst.Close()
 
 	r, err := inst.NewReader(*flowID)
 	if err != nil {
-		log.Fatalf("NewReader: %v", err)
+		return fmt.Errorf("NewReader: %w", err)
 	}
 	defer r.Close()
 
 	info, err := r.Info()
 	if err != nil {
-		log.Fatalf("Info: %v", err)
+		return fmt.Errorf("Info: %w", err)
 	}
 	log.Printf("flow format=%s grainRate=%d/%d grainCount=%d sliceSizes=%v",
 		info.Config.Common.Format,
@@ -67,7 +78,7 @@ func main() {
 		info.Config.Discrete.SliceSizes)
 
 	if !info.Config.Common.Format.IsDiscrete() {
-		log.Fatalf("flow %s is not a discrete flow (samples not yet supported)", *flowID)
+		return fmt.Errorf("flow %s is not a discrete flow (samples not yet supported)", *flowID)
 	}
 
 	stop := make(chan os.Signal, 1)
@@ -76,7 +87,7 @@ func main() {
 	rate := info.Config.Common.GrainRate
 	idx := mxl.CurrentIndex(rate)
 	if idx == mxl.UndefinedIndex {
-		log.Fatalf("invalid edit rate")
+		return errors.New("invalid edit rate")
 	}
 
 	seen := 0
@@ -84,7 +95,7 @@ func main() {
 		select {
 		case <-stop:
 			log.Printf("stopping: %d grains read", seen)
-			return
+			return nil
 		default:
 		}
 
@@ -97,7 +108,7 @@ func main() {
 			seen++
 			if *count > 0 && seen >= *count {
 				log.Printf("done: %d grains read", seen)
-				return
+				return nil
 			}
 		case errors.Is(err, mxl.ErrTimeout):
 			// Writer is slow or stopped; resync to current.
@@ -110,7 +121,7 @@ func main() {
 			log.Printf("fell behind, resyncing")
 			idx = mxl.CurrentIndex(rate)
 		default:
-			log.Fatalf("GetGrain: %v", err)
+			return fmt.Errorf("GetGrain: %w", err)
 		}
 	}
 }

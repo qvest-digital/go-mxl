@@ -11,7 +11,10 @@
 package main
 
 import (
+	"errors"
 	"flag"
+	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -21,31 +24,70 @@ import (
 )
 
 func main() {
+	if err := run(os.Args[1:], os.Stderr); err != nil && !errors.Is(err, flag.ErrHelp) {
+		log.Fatal(err)
+	}
+}
+
+// defaultBatch returns the per-batch sample count: override when > 0, else
+// ~10 ms of audio at rate, clamped to at least one sample.
+func defaultBatch(rate mxl.Rational, override int) uint64 {
+	batch := uint64(override)
+	if batch == 0 {
+		batch = uint64(rate.Num / (100 * rate.Den))
+		if batch == 0 {
+			batch = 1
+		}
+	}
+	return batch
+}
+
+// fillSampleRamp writes a continuous byte ramp starting at start across f1
+// then f2 (the two ring-buffer fragments of one channel) and returns the
+// next ramp value. A matching reader recomputes the same sequence.
+func fillSampleRamp(f1, f2 []byte, start uint64) uint64 {
+	s := start
+	for i := range f1 {
+		f1[i] = byte(s & 0xFF)
+		s++
+	}
+	for i := range f2 {
+		f2[i] = byte(s & 0xFF)
+		s++
+	}
+	return s
+}
+
+func run(args []string, stderr io.Writer) error {
+	fs := flag.NewFlagSet("write-samples", flag.ContinueOnError)
+	fs.SetOutput(stderr)
 	var (
-		domain    = flag.String("domain", "/dev/shm/mxl", "MXL domain directory (tmpfs)")
-		flowDef   = flag.String("flow-def", "", "Path to JSON flow definition")
-		batchSize = flag.Int("batch", 0, "Samples per batch (0 = ~10 ms)")
-		count     = flag.Int64("count", 0, "Stop after N samples (0 = run forever)")
+		domain    = fs.String("domain", "/dev/shm/mxl", "MXL domain directory (tmpfs)")
+		flowDef   = fs.String("flow-def", "", "Path to JSON flow definition")
+		batchSize = fs.Int("batch", 0, "Samples per batch (0 = ~10 ms)")
+		count     = fs.Int64("count", 0, "Stop after N samples (0 = run forever)")
 	)
-	flag.Parse()
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
 
 	if *flowDef == "" {
-		log.Fatalf("missing -flow-def <path>")
+		return errors.New("missing -flow-def <path>")
 	}
 	def, err := os.ReadFile(*flowDef)
 	if err != nil {
-		log.Fatalf("read %s: %v", *flowDef, err)
+		return fmt.Errorf("read %s: %w", *flowDef, err)
 	}
 
 	inst, err := mxl.NewInstance(*domain, "")
 	if err != nil {
-		log.Fatalf("NewInstance: %v", err)
+		return fmt.Errorf("NewInstance: %w", err)
 	}
 	defer inst.Close()
 
 	w, created, err := inst.NewWriter(string(def))
 	if err != nil {
-		log.Fatalf("NewWriter: %v", err)
+		return fmt.Errorf("NewWriter: %w", err)
 	}
 	defer w.Close()
 	if !created {
@@ -54,18 +96,11 @@ func main() {
 
 	cfg := w.Config()
 	if cfg.Common.Format.IsDiscrete() {
-		log.Fatalf("flow format %s is discrete; use write-grain instead", cfg.Common.Format)
+		return fmt.Errorf("flow format %s is discrete; use write-grain instead", cfg.Common.Format)
 	}
 
 	rate := cfg.Common.GrainRate
-	batch := uint64(*batchSize)
-	if batch == 0 {
-		// ~10 ms worth of samples.
-		batch = uint64(rate.Num / (100 * rate.Den))
-		if batch == 0 {
-			batch = 1
-		}
-	}
+	batch := defaultBatch(rate, *batchSize)
 	idx := mxl.CurrentIndex(rate)
 	log.Printf("writing flow sampleRate=%d/%d channels=%d batch=%d first-idx=%d",
 		rate.Num, rate.Den, cfg.Continuous.ChannelCount, batch, idx)
@@ -78,39 +113,30 @@ func main() {
 		select {
 		case <-stop:
 			log.Printf("stopping after %d samples", written)
-			return
+			return nil
 		default:
 		}
 
 		sa, err := w.OpenSamples(idx, int(batch))
 		if err != nil {
-			log.Fatalf("OpenSamples(%d, %d): %v", idx, batch, err)
+			return fmt.Errorf("OpenSamples(%d, %d): %w", idx, batch, err)
 		}
 		// Fill every channel with a continuous byte ramp.
-		samp := written
 		for ch := uint64(0); ch < sa.ChannelCount; ch++ {
 			f1, f2, err := sa.ChannelFragments(ch)
 			if err != nil {
-				log.Fatalf("ChannelFragments(%d): %v", ch, err)
+				return fmt.Errorf("ChannelFragments(%d): %w", ch, err)
 			}
-			s := samp
-			for i := range f1 {
-				f1[i] = byte(s & 0xFF)
-				s++
-			}
-			for i := range f2 {
-				f2[i] = byte(s & 0xFF)
-				s++
-			}
+			fillSampleRamp(f1, f2, written)
 		}
 		if err := sa.Commit(); err != nil {
-			log.Fatalf("Commit: %v", err)
+			return fmt.Errorf("Commit: %w", err)
 		}
 
 		written += batch
 		if *count > 0 && written >= uint64(*count) {
 			log.Printf("done: %d samples written", written)
-			return
+			return nil
 		}
 
 		idx += batch

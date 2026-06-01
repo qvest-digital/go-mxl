@@ -16,6 +16,8 @@ package main
 import (
 	"errors"
 	"flag"
+	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -27,50 +29,60 @@ import (
 )
 
 func main() {
+	if err := run(os.Args[1:], os.Stderr); err != nil && !errors.Is(err, flag.ErrHelp) {
+		log.Fatal(err)
+	}
+}
+
+func run(args []string, stderr io.Writer) error {
+	fs := flag.NewFlagSet("fabrics-target", flag.ContinueOnError)
+	fs.SetOutput(stderr)
 	var (
-		domain     = flag.String("domain", "/dev/shm/mxl-tgt", "MXL domain directory (tmpfs)")
-		flowDef    = flag.String("flow-def", "", "Path to JSON flow definition")
-		providerS  = flag.String("provider", "tcp", "libmxl-fabrics provider (tcp|verbs|efa|shm)")
-		node       = flag.String("node", "127.0.0.1", "Endpoint address (bind)")
-		service    = flag.String("service", "23456", "Endpoint port/service")
-		targetFile = flag.String("target-info", "target.info", "Path to write the serialized TargetInfo")
-		timeout    = flag.Duration("timeout", 500*time.Millisecond, "Per-poll wait timeout")
+		domain     = fs.String("domain", "/dev/shm/mxl-tgt", "MXL domain directory (tmpfs)")
+		flowDef    = fs.String("flow-def", "", "Path to JSON flow definition")
+		providerS  = fs.String("provider", "tcp", "libmxl-fabrics provider (tcp|verbs|efa|shm)")
+		node       = fs.String("node", "127.0.0.1", "Endpoint address (bind)")
+		service    = fs.String("service", "23456", "Endpoint port/service")
+		targetFile = fs.String("target-info", "target.info", "Path to write the serialized TargetInfo")
+		timeout    = fs.Duration("timeout", 500*time.Millisecond, "Per-poll wait timeout")
 	)
-	flag.Parse()
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
 
 	if *flowDef == "" {
-		log.Fatalf("missing -flow-def <path>")
+		return errors.New("missing -flow-def <path>")
 	}
 	def, err := os.ReadFile(*flowDef)
 	if err != nil {
-		log.Fatalf("read %s: %v", *flowDef, err)
+		return fmt.Errorf("read %s: %w", *flowDef, err)
 	}
 	provider, err := fabrics.ParseProvider(*providerS)
 	if err != nil {
-		log.Fatalf("parse -provider %q: %v", *providerS, err)
+		return fmt.Errorf("parse -provider %q: %w", *providerS, err)
 	}
 
 	inst, err := mxl.NewInstance(*domain, "")
 	if err != nil {
-		log.Fatalf("mxl.NewInstance: %v", err)
+		return fmt.Errorf("mxl.NewInstance: %w", err)
 	}
 	defer inst.Close()
 
 	w, _, err := inst.NewWriter(string(def))
 	if err != nil {
-		log.Fatalf("NewWriter: %v", err)
+		return fmt.Errorf("NewWriter: %w", err)
 	}
 	defer w.Close()
 
 	fi, err := fabrics.NewInstance(inst)
 	if err != nil {
-		log.Fatalf("fabrics.NewInstance: %v", err)
+		return fmt.Errorf("fabrics.NewInstance: %w", err)
 	}
 	defer fi.Close()
 
 	tgt, err := fi.NewTarget()
 	if err != nil {
-		log.Fatalf("NewTarget: %v", err)
+		return fmt.Errorf("NewTarget: %w", err)
 	}
 	defer tgt.Close()
 
@@ -80,16 +92,16 @@ func main() {
 		Writer:   w,
 	})
 	if err != nil {
-		log.Fatalf("Target.Setup: %v", err)
+		return fmt.Errorf("Target.Setup: %w", err)
 	}
 	defer info.Close()
 
 	s, err := info.MarshalString()
 	if err != nil {
-		log.Fatalf("TargetInfo.MarshalString: %v", err)
+		return fmt.Errorf("TargetInfo.MarshalString: %w", err)
 	}
 	if err := os.WriteFile(*targetFile, []byte(s), 0o644); err != nil {
-		log.Fatalf("write %s: %v", *targetFile, err)
+		return fmt.Errorf("write %s: %w", *targetFile, err)
 	}
 	log.Printf("target bound %s:%s, wrote info to %s (%d bytes)", *node, *service, *targetFile, len(s))
 
@@ -100,7 +112,7 @@ func main() {
 		select {
 		case <-stop:
 			log.Printf("stopping")
-			return
+			return nil
 		default:
 		}
 		idx, err := tgt.ReadGrain(*timeout)
@@ -110,7 +122,7 @@ func main() {
 		case errors.Is(err, fabrics.ErrNotReady):
 			// Idle tick; loop.
 		default:
-			log.Fatalf("ReadGrain: %v", err)
+			return fmt.Errorf("ReadGrain: %w", err)
 		}
 	}
 }

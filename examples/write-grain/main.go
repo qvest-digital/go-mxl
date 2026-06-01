@@ -11,7 +11,10 @@
 package main
 
 import (
+	"errors"
 	"flag"
+	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -21,30 +24,48 @@ import (
 )
 
 func main() {
+	if err := run(os.Args[1:], os.Stderr); err != nil && !errors.Is(err, flag.ErrHelp) {
+		log.Fatal(err)
+	}
+}
+
+// fillGrainRamp writes byte((i+start)&0xFF) across buf. A matching reader
+// uses the same pattern to verify grain continuity.
+func fillGrainRamp(buf []byte, start uint64) {
+	for i := range buf {
+		buf[i] = byte((uint64(i) + start) & 0xFF)
+	}
+}
+
+func run(args []string, stderr io.Writer) error {
+	fs := flag.NewFlagSet("write-grain", flag.ContinueOnError)
+	fs.SetOutput(stderr)
 	var (
-		domain  = flag.String("domain", "/dev/shm/mxl", "MXL domain directory (tmpfs)")
-		flowDef = flag.String("flow-def", "", "Path to JSON flow definition")
-		count   = flag.Int64("count", 0, "Stop after N grains (0 = run forever)")
+		domain  = fs.String("domain", "/dev/shm/mxl", "MXL domain directory (tmpfs)")
+		flowDef = fs.String("flow-def", "", "Path to JSON flow definition")
+		count   = fs.Int64("count", 0, "Stop after N grains (0 = run forever)")
 	)
-	flag.Parse()
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
 
 	if *flowDef == "" {
-		log.Fatalf("missing -flow-def <path>")
+		return errors.New("missing -flow-def <path>")
 	}
 	def, err := os.ReadFile(*flowDef)
 	if err != nil {
-		log.Fatalf("read %s: %v", *flowDef, err)
+		return fmt.Errorf("read %s: %w", *flowDef, err)
 	}
 
 	inst, err := mxl.NewInstance(*domain, "")
 	if err != nil {
-		log.Fatalf("NewInstance: %v", err)
+		return fmt.Errorf("NewInstance: %w", err)
 	}
 	defer inst.Close()
 
 	w, created, err := inst.NewWriter(string(def))
 	if err != nil {
-		log.Fatalf("NewWriter: %v", err)
+		return fmt.Errorf("NewWriter: %w", err)
 	}
 	defer w.Close()
 	if !created {
@@ -53,7 +74,7 @@ func main() {
 
 	cfg := w.Config()
 	if !cfg.Common.Format.IsDiscrete() {
-		log.Fatalf("flow format %s is not discrete; use write-samples instead", cfg.Common.Format)
+		return fmt.Errorf("flow format %s is not discrete; use write-samples instead", cfg.Common.Format)
 	}
 	rate := cfg.Common.GrainRate
 	idx := mxl.CurrentIndex(rate)
@@ -67,25 +88,23 @@ func main() {
 		select {
 		case <-stop:
 			log.Printf("stopping after %d grains", written)
-			return
+			return nil
 		default:
 		}
 
 		ga, err := w.OpenGrain(idx)
 		if err != nil {
-			log.Fatalf("OpenGrain(%d): %v", idx, err)
+			return fmt.Errorf("OpenGrain(%d): %w", idx, err)
 		}
-		for i := range ga.Payload {
-			ga.Payload[i] = byte((uint64(i) + idx) & 0xFF)
-		}
+		fillGrainRamp(ga.Payload, idx)
 		if err := ga.Commit(ga.TotalSlices, 0); err != nil {
-			log.Fatalf("Commit(%d): %v", idx, err)
+			return fmt.Errorf("Commit(%d): %w", idx, err)
 		}
 
 		written++
 		if *count > 0 && written >= *count {
 			log.Printf("done: %d grains written", written)
-			return
+			return nil
 		}
 
 		idx++
