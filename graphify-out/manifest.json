@@ -1,0 +1,407 @@
+{
+  "/home/daniel/projects/go-mxl/.devcontainer/image/devcontainer.json": {
+    "mtime": 1780341328.8739784,
+    "ast_hash": "0abe17322a585dc651a98c1d7e5930eb",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/.devcontainer/local/devcontainer.json": {
+    "mtime": 1780341328.8739784,
+    "ast_hash": "a792797800db79f5af08d959c594a20f",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/.github/prerelease-config.json": {
+    "mtime": 1780341328.8741133,
+    "ast_hash": "97ebf41cac6d7321ef7bc01431cfc8fe",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/.github/prerelease-manifest.json": {
+    "mtime": 1780348657.4328394,
+    "ast_hash": "d12009da7358b2a0921bafebac40531a",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/.github/release-config.json": {
+    "mtime": 1780341328.8741133,
+    "ast_hash": "5bd41c726e7f9169bd325e9534476e1f",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/.github/release-manifest.json": {
+    "mtime": 1780341328.8741133,
+    "ast_hash": "2f5e01e9c28cac4d3704bf0e9608602c",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/.omc/project-memory.json": {
+    "mtime": 1780349461.822088,
+    "ast_hash": "2922aa006d56ab1c527091b9703ee9bd",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/.omc/sessions/441ad7a7-88be-406b-83e6-75605b3b89ec.json": {
+    "mtime": 1780347041.8577228,
+    "ast_hash": "a9cfe0614475d8a66ec6bddbcb83e044",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/.omc/sessions/d12f36ef-d255-47c4-9a1e-e29cc491f37f.json": {
+    "mtime": 1780347031.7398005,
+    "ast_hash": "85ddb83f89886a8ef4f8ebc217add200",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/.omc/state/checkpoints/checkpoint-2026-06-01T21-15-59-720Z.json": {
+    "mtime": 1780348559.7206056,
+    "ast_hash": "59e76ca1780af702939bba077f17e1fd",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/.omc/state/checkpoints/checkpoint-2026-06-01T21-29-50-100Z.json": {
+    "mtime": 1780349390.0991936,
+    "ast_hash": "e5981ba20723dc453e3107ad923d2ec7",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/.omc/state/hud-stdin-cache.json": {
+    "mtime": 1780349624.4675019,
+    "ast_hash": "de8846d6ea9cf6ea0c5a6988a8295ff8",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/.omc/state/last-tool-error.json": {
+    "mtime": 1780349156.061847,
+    "ast_hash": "e19e7aca1990e2a3a9d9967a99fbba8d",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/.omc/state/mission-state.json": {
+    "mtime": 1780349498.1484199,
+    "ast_hash": "a5d6f855d621ffb14d5f2d93570fc697",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/.omc/state/sessions/5194dba8-d1da-4481-b5a6-91f3b02449ff/session-started.json": {
+    "mtime": 1780349547.0760658,
+    "ast_hash": "8bb6cda25165d966c96f1757dccd2511",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/.omc/state/sessions/776f7730-bc44-45a1-b679-c6dcb2a9c5c9/hud-state.json": {
+    "mtime": 1780349252.39816,
+    "ast_hash": "51251736f4d387bfae082ae4a3723e51",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/.omc/state/sessions/776f7730-bc44-45a1-b679-c6dcb2a9c5c9/session-started.json": {
+    "mtime": 1780348357.896096,
+    "ast_hash": "13baea34e86f4a1ecf76a40cdf65cbef",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/.omc/state/sessions/98a599be-d744-4997-b542-89222145bcaf/hud-state.json": {
+    "mtime": 1780348403.4647377,
+    "ast_hash": "fc76ccb642ce9c32cecfd0d665568e2e",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/.omc/state/sessions/98a599be-d744-4997-b542-89222145bcaf/session-started.json": {
+    "mtime": 1780349438.1528509,
+    "ast_hash": "585e26edc2c268742d032f8b026e9013",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/.omc/state/sessions/a7cea0db-d949-4156-aed5-f33555437ded/hud-state.json": {
+    "mtime": 1780349557.372991,
+    "ast_hash": "7252b66ffd9eef4b9d9031377f5aba98",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/.omc/state/sessions/a7cea0db-d949-4156-aed5-f33555437ded/session-started.json": {
+    "mtime": 1780349249.1931822,
+    "ast_hash": "39dfd100624272756b1efb1167e71a4d",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/.omc/state/sessions/d12f36ef-d255-47c4-9a1e-e29cc491f37f/hud-state.json": {
+    "mtime": 1780344249.4406884,
+    "ast_hash": "c648885de3107be388c5ffd43884e18a",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/.omc/state/subagent-tracking.json": {
+    "mtime": 1780349498.248419,
+    "ast_hash": "74389edd1c886774f4ebecab8a20858c",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/examples/fabrics-initiator/main.go": {
+    "mtime": 1780346537.080585,
+    "ast_hash": "cf3a3eae18cb449819f428fde6517690",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/examples/fabrics-target/main.go": {
+    "mtime": 1780346537.0815852,
+    "ast_hash": "ebbc4f16cccd5de7a7ad3527f97bc879",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/examples/read-grain/main.go": {
+    "mtime": 1780341328.8747919,
+    "ast_hash": "a32723de6c08b6e9bafb4f0bb6a9b110",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/examples/read-samples/main.go": {
+    "mtime": 1780341328.8747919,
+    "ast_hash": "09c0b610de68ebf47ccb09200e3f3315",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/examples/sync-group/main.go": {
+    "mtime": 1780341328.8747919,
+    "ast_hash": "25b549f99833a1f0809aeb052aee3ae8",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/examples/write-grain/main.go": {
+    "mtime": 1780341328.8747919,
+    "ast_hash": "47677d7b95f7cedf60d5ed63a4d833fe",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/examples/write-samples/main.go": {
+    "mtime": 1780341328.8747919,
+    "ast_hash": "f2e8b0f15532baeb3f426f9945b7b15f",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/fabrics/cgo.go": {
+    "mtime": 1780341328.8747919,
+    "ast_hash": "4d89115e2854d8d142e19b7b2984372f",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/fabrics/doc.go": {
+    "mtime": 1780348211.141106,
+    "ast_hash": "76416231806efcc6d698c57f290df710",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/fabrics/endpoint.go": {
+    "mtime": 1780341328.8751729,
+    "ast_hash": "6b37e1edfb4b29320f3e6ceabc45ba16",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/fabrics/initiator.go": {
+    "mtime": 1780348211.1412048,
+    "ast_hash": "50bd23a7e125166dea389f402f36a30e",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/fabrics/initiator_test.go": {
+    "mtime": 1780348211.1412048,
+    "ast_hash": "85afb8b0d3e988d1830cbc3d9b11e002",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/fabrics/instance.go": {
+    "mtime": 1780346537.0815852,
+    "ast_hash": "38121afde4f270b6da5f24cdb420db43",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/fabrics/instance_test.go": {
+    "mtime": 1780341328.8751729,
+    "ast_hash": "c724d73dbe48d9efed1d2f94b2637dd9",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/fabrics/integration_test.go": {
+    "mtime": 1780348211.1412048,
+    "ast_hash": "8867a0ea1e70f5e29614aa486895cf4c",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/fabrics/provider.go": {
+    "mtime": 1780341328.8751729,
+    "ast_hash": "0a40da04c5a003629a183f475ff48541",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/fabrics/provider_test.go": {
+    "mtime": 1780341328.8751729,
+    "ast_hash": "b50196cbe6fd5df59086d9ed6dbcccf9",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/fabrics/status.go": {
+    "mtime": 1780341328.8751729,
+    "ast_hash": "722d60dd495e08223cb6cb4f447537f0",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/fabrics/status_test.go": {
+    "mtime": 1780341328.8751729,
+    "ast_hash": "3e95558605c8ac0e844e2e803f51d0ba",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/fabrics/target.go": {
+    "mtime": 1780348211.1412048,
+    "ast_hash": "c9396cf0d4954725785e68e1cf9ad127",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/fabrics/target_info.go": {
+    "mtime": 1780341328.8751729,
+    "ast_hash": "f3703ef2b3bee251b7dec51da2311e01",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/fabrics/target_info_test.go": {
+    "mtime": 1780346537.0815852,
+    "ast_hash": "0a4eb684d4a7735005aefb33011fdff2",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/fabrics/target_test.go": {
+    "mtime": 1780348211.1412048,
+    "ast_hash": "16356a2ad87da93958aa3ed76dd8cc4b",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/fabrics/util.go": {
+    "mtime": 1780341328.8751729,
+    "ast_hash": "ed54f18509136aa7a335bd8cdf252e20",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/fabrics/util_test.go": {
+    "mtime": 1780341328.8751729,
+    "ast_hash": "5451323964f66f5617e231eca8067a93",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/mxl/cgo.go": {
+    "mtime": 1780341328.8787177,
+    "ast_hash": "21348c9f5691a44970c0298f2140ab7b",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/mxl/doc.go": {
+    "mtime": 1780341328.8793933,
+    "ast_hash": "e4ab835241f076a9db869ad1b01266c9",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/mxl/flowinfo.go": {
+    "mtime": 1780341328.8793933,
+    "ast_hash": "5f0f297d524d691460b3843f1b9257ec",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/mxl/flowinfo_test.go": {
+    "mtime": 1780341328.8793933,
+    "ast_hash": "eda7bfef7415617779302cb51c498aaf",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/mxl/grain.go": {
+    "mtime": 1780341328.8793933,
+    "ast_hash": "e457844ea12509c664732052756558c9",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/mxl/grain_test.go": {
+    "mtime": 1780341328.8793933,
+    "ast_hash": "5e2b834e1116ae72f880a4804c40799e",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/mxl/instance.go": {
+    "mtime": 1780341328.8793933,
+    "ast_hash": "1fbfd8e9fd40d1d0184061c6aa4bb401",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/mxl/instance_test.go": {
+    "mtime": 1780341328.8793933,
+    "ast_hash": "6fe4637e00f0e43ddc16a314b7fd2b1a",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/mxl/integration_test.go": {
+    "mtime": 1780341328.8793933,
+    "ast_hash": "9fc06c57f10137af32f9d635e387bc37",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/mxl/internal_helpers.h": {
+    "mtime": 1780341328.8793933,
+    "ast_hash": "999714c91858ea2a18976c5f495eb2fe",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/mxl/reader.go": {
+    "mtime": 1780341328.8793933,
+    "ast_hash": "22e4d4287128e6f45b35934c39417e39",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/mxl/reader_test.go": {
+    "mtime": 1780341328.8793933,
+    "ast_hash": "6bf2d345837873438a64b5cf9eb87dfa",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/mxl/samples_reader.go": {
+    "mtime": 1780341328.8793933,
+    "ast_hash": "c74eeacb0618ab98ed0396ca99be0f5f",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/mxl/status.go": {
+    "mtime": 1780341328.8793933,
+    "ast_hash": "ee8cd67598e1399c9e29c14dbece634c",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/mxl/status_test.go": {
+    "mtime": 1780341328.8793933,
+    "ast_hash": "9b045e40ca389845be3fb9e107d6c763",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/mxl/sync_group.go": {
+    "mtime": 1780341328.8793933,
+    "ast_hash": "cd2c5cf987ee975c1656657514000012",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/mxl/sync_group_test.go": {
+    "mtime": 1780341328.8793933,
+    "ast_hash": "f56a052ddeb6b55757dd6d9a39572ef1",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/mxl/time.go": {
+    "mtime": 1780341328.8793933,
+    "ast_hash": "5d3e36bb9b7da03c88874f7aaeb2fc73",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/mxl/time_test.go": {
+    "mtime": 1780341328.8793933,
+    "ast_hash": "e2d5235d5390e3f1f4ce8d145c075d98",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/mxl/union_helpers.go": {
+    "mtime": 1780341328.8793933,
+    "ast_hash": "d16ab2a1c100448b8c7b27860f050724",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/mxl/writer.go": {
+    "mtime": 1780341328.8793933,
+    "ast_hash": "be31a8ae2b222f9a3a3c804d1457e555",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/mxl/writer_test.go": {
+    "mtime": 1780341328.8793933,
+    "ast_hash": "917bb7100e1c074411e3870df9a06e95",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/renovate.json": {
+    "mtime": 1780341328.8793933,
+    "ast_hash": "3590f4e5823552a14c18cff1158d5505",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/.claude/skills/graphify/SKILL.md": {
+    "mtime": 1780341328.8737783,
+    "ast_hash": "5ae00786ea53e4d944ab70abe11eedd1",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/.github/workflows/ci.yml": {
+    "mtime": 1780341328.8741133,
+    "ast_hash": "c6379c7e02818ee643c6453a03b7be9c",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/.github/workflows/release-please.yml": {
+    "mtime": 1780341328.8743188,
+    "ast_hash": "75dbe0820c777f2c6ad983a5b70d94ae",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/.remember/now.md": {
+    "mtime": 1780349563.162949,
+    "ast_hash": "a30eee1c41ad1f316d71212ce38d26aa",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/.remember/today-2026-06-01.md": {
+    "mtime": 1780346519.6279974,
+    "ast_hash": "864bf79ff8fb421cf431e19ce79e1547",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/CHANGELOG.md": {
+    "mtime": 1780348657.432911,
+    "ast_hash": "ed5466b395d6962c7d3c2ae7e357c085",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/CLAUDE.md": {
+    "mtime": 1780341328.8743188,
+    "ast_hash": "e9842f2048c84cdeb80265bda65ba97a",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/README.md": {
+    "mtime": 1780348322.096713,
+    "ast_hash": "92fa04653f15362caee4d2ae00923898",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/docs/docker.md": {
+    "mtime": 1780341328.8743188,
+    "ast_hash": "bc528cddd7e8bb6938042902027dadfe",
+    "semantic_hash": ""
+  },
+  "/home/daniel/projects/go-mxl/examples/README.md": {
+    "mtime": 1780341328.8743188,
+    "ast_hash": "01f6ab9843282de9eb7b70fe37a68edc",
+    "semantic_hash": ""
+  }
+}
