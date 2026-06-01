@@ -37,6 +37,21 @@ const flowJSON = `{
 
 const flowID = "5fbec3b1-1b0f-417d-9059-8b94a47197ed"
 
+const audioFlowJSON = `{
+  "description": "go-mxl fabrics test audio, 48k stereo",
+  "id": "b3bb5be7-9fe9-4324-a5bb-4c70e1084449",
+  "format": "urn:x-nmos:format:audio",
+  "label": "go-mxl fabrics test audio",
+  "tags": { "urn:x-nmos:tag:grouphint/v1.0": ["go-mxl fabrics test:Audio"] },
+  "parents": [],
+  "media_type": "audio/float32",
+  "sample_rate": { "numerator": 48000 },
+  "channel_count": 2,
+  "bit_depth": 32
+}`
+
+const audioFlowID = "b3bb5be7-9fe9-4324-a5bb-4c70e1084449"
+
 func newDomain(t *testing.T) *mxl.Instance {
 	t.Helper()
 	if _, err := os.Stat("/dev/shm"); err != nil {
@@ -246,6 +261,213 @@ func TestFabricsGrainTransferTCP(t *testing.T) {
 		}
 	}
 	if err := ga.Cancel(); err != nil {
+		t.Fatalf("tgt Cancel: %v", err)
+	}
+}
+
+// TestFabricsSampleTransferTCP exercises the continuous (audio) data path over
+// libfabric's TCP provider on loopback, mirroring TestFabricsGrainTransferTCP.
+// A writer fills a batch of samples, the initiator transfers it to the target,
+// and the bytes land in the receiving writer's flow memory.
+func TestFabricsSampleTransferTCP(t *testing.T) {
+	srcInst := newDomain(t)
+	tgtInst := newDomain(t)
+
+	srcWriter, _, err := srcInst.NewWriter(audioFlowJSON)
+	if err != nil {
+		t.Fatalf("src NewWriter: %v", err)
+	}
+	t.Cleanup(func() { srcWriter.Close() })
+
+	srcReader, err := srcInst.NewReader(audioFlowID)
+	if err != nil {
+		t.Fatalf("src NewReader: %v", err)
+	}
+	t.Cleanup(func() { srcReader.Close() })
+
+	tgtWriter, _, err := tgtInst.NewWriter(audioFlowJSON)
+	if err != nil {
+		t.Fatalf("tgt NewWriter: %v", err)
+	}
+	t.Cleanup(func() { tgtWriter.Close() })
+
+	srcFab, err := fabrics.NewInstance(srcInst)
+	if err != nil {
+		t.Fatalf("src fabrics.NewInstance: %v", err)
+	}
+	t.Cleanup(func() { srcFab.Close() })
+
+	tgtFab, err := fabrics.NewInstance(tgtInst)
+	if err != nil {
+		t.Fatalf("tgt fabrics.NewInstance: %v", err)
+	}
+	t.Cleanup(func() { tgtFab.Close() })
+
+	target, err := tgtFab.NewTarget()
+	if err != nil {
+		t.Fatalf("NewTarget: %v", err)
+	}
+	t.Cleanup(func() { target.Close() })
+
+	targetPort := freePort(t)
+	initiatorPort := freePort(t)
+
+	info, err := target.Setup(fabrics.TargetConfig{
+		Endpoint: fabrics.EndpointAddress{Node: "127.0.0.1", Service: targetPort},
+		Provider: fabrics.ProviderTCP,
+		Writer:   tgtWriter,
+	})
+	if err != nil {
+		t.Fatalf("Target.Setup: %v", err)
+	}
+	t.Cleanup(func() { info.Close() })
+
+	initiator, err := srcFab.NewInitiator()
+	if err != nil {
+		t.Fatalf("NewInitiator: %v", err)
+	}
+	t.Cleanup(func() { initiator.Close() })
+	if err := initiator.Setup(fabrics.InitiatorConfig{
+		Endpoint: fabrics.EndpointAddress{Node: "127.0.0.1", Service: initiatorPort},
+		Provider: fabrics.ProviderTCP,
+		Reader:   srcReader,
+	}); err != nil {
+		t.Fatalf("Initiator.Setup: %v", err)
+	}
+	if err := initiator.AddTarget(info); err != nil {
+		t.Fatalf("AddTarget: %v", err)
+	}
+
+	// Both sides must be progressed before the initiator reports the
+	// connection up; the target advances its handshake state from inside
+	// its non-blocking read.
+	connectDeadline := time.Now().Add(10 * time.Second)
+	for {
+		if time.Now().After(connectDeadline) {
+			t.Fatalf("initiator did not reach connected state within 10s")
+		}
+		_, _, rerr := target.ReadSamplesNonBlocking()
+		if rerr != nil && !errors.Is(rerr, fabrics.ErrNotReady) {
+			t.Fatalf("target ReadSamplesNonBlocking during setup: %v", rerr)
+		}
+		err := initiator.MakeProgressNonBlocking()
+		if err == nil {
+			break
+		}
+		if !errors.Is(err, fabrics.ErrNotReady) {
+			t.Fatalf("initiator MakeProgressNonBlocking: %v", err)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	// Fill one batch of samples on the source writer with a per-channel byte
+	// ramp keyed to absolute position so the receiving side can verify it.
+	const batch = 480 // 10 ms at 48 kHz
+	rate := srcWriter.Config().Common.GrainRate
+	idx := mxl.CurrentIndex(rate)
+	sa, err := srcWriter.OpenSamples(idx, batch)
+	if err != nil {
+		t.Fatalf("OpenSamples: %v", err)
+	}
+	for ch := uint64(0); ch < sa.ChannelCount; ch++ {
+		f1, f2, err := sa.ChannelFragments(ch)
+		if err != nil {
+			t.Fatalf("ChannelFragments(%d): %v", ch, err)
+		}
+		var pos uint64
+		for _, frag := range [][]byte{f1, f2} {
+			for i := range frag {
+				frag[i] = byte((pos + idx + ch) & 0xFF)
+				pos++
+			}
+		}
+	}
+	if err := sa.Commit(); err != nil {
+		t.Fatalf("Commit: %v", err)
+	}
+
+	if err := initiator.TransferSamples(idx, batch); err != nil {
+		t.Fatalf("TransferSamples: %v", err)
+	}
+
+	// Drive both sides until the samples arrive at the target.
+	deadline := time.Now().Add(5 * time.Second)
+	var (
+		gotHead  uint64
+		gotCount int
+		wg       sync.WaitGroup
+		stop     = make(chan struct{})
+	)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			err := initiator.MakeProgressNonBlocking()
+			if err != nil && !errors.Is(err, fabrics.ErrNotReady) {
+				t.Errorf("initiator MakeProgressNonBlocking: %v", err)
+				return
+			}
+			time.Sleep(5 * time.Millisecond)
+		}
+	}()
+
+	for {
+		if time.Now().After(deadline) {
+			close(stop)
+			wg.Wait()
+			t.Fatalf("samples did not arrive at target within 5s")
+		}
+		head, count, err := target.ReadSamples(100 * time.Millisecond)
+		if err == nil {
+			gotHead = head
+			gotCount = count
+			break
+		}
+		if !errors.Is(err, fabrics.ErrNotReady) {
+			close(stop)
+			wg.Wait()
+			t.Fatalf("Target.ReadSamples: %v", err)
+		}
+	}
+	close(stop)
+	wg.Wait()
+
+	if gotHead != idx {
+		t.Fatalf("target reported head=%d, want %d", gotHead, idx)
+	}
+	if gotCount != batch {
+		t.Fatalf("target reported count=%d, want %d", gotCount, batch)
+	}
+
+	// The fabric writes the samples directly into the target's flow memory.
+	// Opening the same range on the target writer surfaces the populated
+	// bytes; Cancel leaves the head untouched.
+	sa2, err := tgtWriter.OpenSamples(idx, batch)
+	if err != nil {
+		t.Fatalf("tgt OpenSamples: %v", err)
+	}
+	for ch := uint64(0); ch < sa2.ChannelCount; ch++ {
+		f1, f2, err := sa2.ChannelFragments(ch)
+		if err != nil {
+			t.Fatalf("tgt ChannelFragments(%d): %v", ch, err)
+		}
+		var pos uint64
+		for _, frag := range [][]byte{f1, f2} {
+			for i := range frag {
+				want := byte((pos + idx + ch) & 0xFF)
+				if frag[i] != want {
+					t.Fatalf("ch%d sample byte at pos %d: got %d, want %d", ch, pos, frag[i], want)
+				}
+				pos++
+			}
+		}
+	}
+	if err := sa2.Cancel(); err != nil {
 		t.Fatalf("tgt Cancel: %v", err)
 	}
 }

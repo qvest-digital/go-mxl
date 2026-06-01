@@ -178,6 +178,9 @@ func TestInitiatorMethodsAfterClose(t *testing.T) {
 	if err := in.TransferGrain(0, 0, 1); !errors.Is(err, mxl.ErrClosed) {
 		t.Errorf("TransferGrain after Close: %v, want ErrClosed", err)
 	}
+	if err := in.TransferSamples(0, 1); !errors.Is(err, mxl.ErrClosed) {
+		t.Errorf("TransferSamples after Close: %v, want ErrClosed", err)
+	}
 	if err := in.MakeProgress(time.Millisecond); !errors.Is(err, mxl.ErrClosed) {
 		t.Errorf("MakeProgress after Close: %v, want ErrClosed", err)
 	}

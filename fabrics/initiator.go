@@ -153,6 +153,20 @@ func (in *Initiator) TransferGrain(grainIdx uint64, startSlice, endSlice uint16)
 	))
 }
 
+// TransferSamples enqueues a transfer of count samples at headIndex to every
+// added target. The call is non-blocking; completion is driven by
+// MakeProgress. Continuous (audio) flows only.
+func (in *Initiator) TransferSamples(headIndex uint64, count int) error {
+	in.mu.Lock()
+	defer in.mu.Unlock()
+	if in.handle == nil {
+		return ErrClosed()
+	}
+	return fabricsStatusErr(C.mxlFabricsInitiatorTransferSamples(
+		in.handle, C.uint64_t(headIndex), C.size_t(count),
+	))
+}
+
 // MakeProgress drives queued transfers, connection setup, and
 // connection shutdown for up to timeout. Returns ErrNotReady if there
 // is still progress to be made when the timeout elapses.

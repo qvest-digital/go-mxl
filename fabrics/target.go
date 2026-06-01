@@ -137,6 +137,42 @@ func (t *Target) ReadGrainNonBlocking() (uint64, error) {
 	return uint64(idx), nil
 }
 
+// ReadSamples blocks until samples have been written by an initiator (or
+// timeout elapses) and returns the head index of the received range and the
+// per-channel sample count. Returns ErrNotReady if no samples arrived before
+// the timeout. Continuous (audio) flows only.
+func (t *Target) ReadSamples(timeout time.Duration) (headIndex uint64, count int, err error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.handle == nil {
+		return 0, 0, ErrClosed()
+	}
+	var head C.uint64_t
+	var n C.size_t
+	rc := C.mxlFabricsTargetReadSamples(t.handle, C.uint16_t(timeoutMs(timeout)), &head, &n)
+	if err := fabricsStatusErr(rc); err != nil {
+		return 0, 0, err
+	}
+	return uint64(head), int(n), nil
+}
+
+// ReadSamplesNonBlocking is the non-blocking variant of ReadSamples.
+// Returns ErrNotReady if no samples are currently available.
+func (t *Target) ReadSamplesNonBlocking() (headIndex uint64, count int, err error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.handle == nil {
+		return 0, 0, ErrClosed()
+	}
+	var head C.uint64_t
+	var n C.size_t
+	rc := C.mxlFabricsTargetReadSamplesNonBlocking(t.handle, &head, &n)
+	if err := fabricsStatusErr(rc); err != nil {
+		return 0, 0, err
+	}
+	return uint64(head), int(n), nil
+}
+
 // Close destroys the Target. Safe to call multiple times.
 func (t *Target) Close() error {
 	t.mu.Lock()
