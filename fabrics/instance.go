@@ -35,7 +35,7 @@ func NewInstance(in *mxl.Instance) (*Instance, error) {
 	}
 
 	var fh C.mxlFabricsInstance
-	rc := C.mxlFabricsCreateInstance(C.mxlInstance(parentHandle), &fh)
+	rc := C.mxlFabricsCreateInstance(C.mxlInstance(parentHandle), nil, &fh)
 	if err := fabricsStatusErr(rc); err != nil {
 		return nil, err
 	}
