@@ -46,32 +46,18 @@ jobs:
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             push=true
             if [ "$GITHUB_REF_TYPE" = "tag" ]; then
-              # Manual tag push. (release-please tags are created with
-              # GITHUB_TOKEN and never reach this branch.)
+              # A vX.Y.Z tag push. release-please cuts these when its
+              # release PR merges; because release-please.yml runs the
+              # action under RELEASE_PLEASE_TOKEN (a PAT), the tag push
+              # starts this run. Hand-pushed tags land here too. Either
+              # way the version is the tag itself.
               version=${GITHUB_REF_NAME#v}
             else
-              # Push to main. `:dev` always tracks main's HEAD, even
-              # when this same commit is also a release commit.
+              # Push to main. `:dev` always tracks main's HEAD. A
+              # release commit's versioned images are published by the
+              # separate tag-triggered run above, not from here.
               builder_tags="${builder_tags},${builder}:dev"
               runtime_tags="${runtime_tags},${runtime}:dev"
-              # release-please.yml runs in parallel and may be tagging
-              # this same SHA. Use the merge commit subject as a cheap
-              # filter, then poll for the tag itself so the version
-              # comes from a real git tag — not from parsing a commit
-              # message.
-              case "$(git log -1 --pretty=%s)" in
-                "chore(main): release "*)
-                  for _ in $(seq 1 24); do
-                    git fetch --tags --quiet origin || true
-                    tag=$(git tag --points-at HEAD --list 'v*' | head -1)
-                    if [ -n "$tag" ]; then
-                      version=${tag#v}
-                      break
-                    fi
-                    sleep 5
-                  done
-                  ;;
-              esac
             fi
             if [ -n "$version" ]; then
               builder_tags="${builder_tags},${builder}:${version}"

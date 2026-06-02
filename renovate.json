@@ -22,27 +22,27 @@
   ],
   "packageRules": [
     {
-      "description": "Group Go module bumps into one PR",
+      "description": "Group Go module bumps into one PR; deps(gomod) so release-please folds the dependency move into the next release under Dependencies",
       "matchManagers": ["gomod"],
       "groupName": "Go modules",
-      "semanticCommitType": "chore",
-      "semanticCommitScope": "deps"
+      "semanticCommitType": "deps",
+      "semanticCommitScope": "gomod"
     },
     {
       "description": "Group GitHub Actions bumps into one PR",
       "matchManagers": ["github-actions"],
       "groupName": "GitHub Actions",
-      "semanticCommitType": "ci",
-      "semanticCommitScope": "deps"
+      "semanticCommitType": "deps",
+      "semanticCommitScope": "actions"
     },
     {
-      "description": "libmxl is intentionally not delayed so upstream-breaking releases surface immediately via a CI-red PR",
+      "description": "libmxl is intentionally not delayed so upstream-breaking releases surface immediately via a CI-red PR; deps(libmxl) folds the bump into the next release under Dependencies",
       "matchManagers": ["custom.regex"],
       "matchFileNames": [".github/libmxl.version"],
       "minimumReleaseAge": "0 days",
       "schedule": ["at any time"],
       "commitMessageTopic": "libmxl",
-      "semanticCommitType": "build",
+      "semanticCommitType": "deps",
       "semanticCommitScope": "libmxl",
       "labels": ["dependencies", "libmxl"]
     }
