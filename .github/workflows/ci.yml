@@ -349,3 +349,26 @@ jobs:
 
       - name: Inspect builder manifest
         run: docker buildx imagetools inspect "$(echo '${{ needs.meta.outputs.builder_tags }}' | cut -d, -f1)"
+
+  # Single branch-protection target. Runs unless the whole workflow is
+  # cancelled, and fails if any upstream job failed or was cancelled.
+  # Required in place of the individual jobs because `merge` is skipped
+  # on fork PRs (and `build`/`merge` skip when `meta` gates out a push),
+  # and a skipped check counts as unsatisfied in branch protection.
+  ci-summary:
+    needs: [meta, build, merge]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Verify upstream jobs
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          set -eu
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          bad=$(echo "$NEEDS" | jq '[.[] | select(.result == "failure" or .result == "cancelled")] | length')
+          if [ "$bad" -ne 0 ]; then
+            echo "::error::$bad required job(s) failed or were cancelled"
+            exit 1
+          fi
