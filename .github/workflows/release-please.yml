@@ -3,6 +3,10 @@ name: release-please
 on:
   push:
     branches: [main]
+  # Manual escape hatch: re-run the release-please pass without
+  # waiting for a new push to main. Useful when a release PR fell
+  # out of sync with main and needs to be regenerated.
+  workflow_dispatch: {}
 
 permissions:
   contents: write
@@ -12,31 +16,24 @@ concurrency:
   group: release-please
 
 jobs:
-  # Every merge to main opens (or updates) a prerelease PR proposing
-  # vX.Y.Z-rc.N. Merging that PR tags the prerelease.
-  prerelease:
+  # Every merge to main opens (or updates) a single release PR
+  # proposing the next tag. Whether that tag is a prerelease
+  # (1.0.0-rc.N) or a stable release (1.0.0) is controlled by the
+  # `prerelease` flag in .github/release-please-config.json. The
+  # config defaults to `prerelease: true`; cutting the first stable
+  # release is the one-line edit `"prerelease": false`, the only
+  # configuration change needed to graduate.
+  #
+  # Authenticated with RELEASE_PLEASE_TOKEN (a PAT) rather than the
+  # default GITHUB_TOKEN so the tag push release-please makes on merge
+  # starts the tag-triggered ci.yml run that publishes the versioned
+  # images. A GITHUB_TOKEN-driven tag push starts no downstream
+  # workflow, so the images would never build.
+  release-please:
     runs-on: ubuntu-24.04
-    outputs:
-      releases_created: ${{ steps.rp.outputs.releases_created }}
-      tag_name: ${{ steps.rp.outputs.tag_name }}
-    steps:
-      - id: rp
-        uses: googleapis/release-please-action@v5
-        with:
-          config-file: .github/prerelease-config.json
-          manifest-file: .github/prerelease-manifest.json
-
-  # Once a prerelease tag exists, a second pass with the release config
-  # opens a follow-up PR proposing the matching final vX.Y.Z. Merging
-  # it cuts the stable release; the release config's extra-files entry
-  # also syncs the prerelease manifest so subsequent rcs start from
-  # the new baseline.
-  release:
-    runs-on: ubuntu-24.04
-    needs: [prerelease]
-    if: needs.prerelease.outputs.releases_created == 'true' && contains(needs.prerelease.outputs.tag_name, 'rc')
     steps:
       - uses: googleapis/release-please-action@v5
         with:
-          config-file: .github/release-config.json
-          manifest-file: .github/release-manifest.json
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          config-file: .github/release-please-config.json
+          manifest-file: .github/release-please-manifest.json
