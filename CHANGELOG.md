@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.0.0-rc.10](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.9...v1.0.0-rc.10) (2026-06-03)
+
+
+### Continuous Integration
+
+* add ci-summary branch-protection gate ([#61](https://github.com/qvest-digital/go-mxl/issues/61)) ([9044401](https://github.com/qvest-digital/go-mxl/commit/9044401e99df3bdefcb6c721788fc04c2b289716))
+* align release-please/renovate with mxl-k8s ([#60](https://github.com/qvest-digital/go-mxl/issues/60)) ([ae67c80](https://github.com/qvest-digital/go-mxl/commit/ae67c801591b050b51f6efce673a7b71682eec21))
+
+
+### Miscellaneous
+
+* gitignore and untrack graphify-out ([#58](https://github.com/qvest-digital/go-mxl/issues/58)) ([3d3ec53](https://github.com/qvest-digital/go-mxl/commit/3d3ec53d0dfb65380e4b0c47950c4eee3c452405))
+
 ## [1.0.0-rc.9](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.8...v1.0.0-rc.9) (2026-06-01)
 
 
