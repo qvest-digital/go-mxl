@@ -16,15 +16,18 @@ import (
 type Provider int
 
 const (
-	ProviderAuto  Provider = C.MXL_FABRICS_PROVIDER_AUTO
+	// ProviderAny lets libmxl-fabrics select a provider. Per the
+	// libmxl-fabrics header this may not be supported by all
+	// implementations and currently always falls back to TCP.
+	ProviderAny   Provider = C.MXL_FABRICS_PROVIDER_ANY
 	ProviderTCP   Provider = C.MXL_FABRICS_PROVIDER_TCP
 	ProviderVerbs Provider = C.MXL_FABRICS_PROVIDER_VERBS
 	ProviderEFA   Provider = C.MXL_FABRICS_PROVIDER_EFA
 	ProviderSHM   Provider = C.MXL_FABRICS_PROVIDER_SHM
 )
 
-// String returns the canonical name of the provider as accepted by
-// mxlFabricsProviderFromString. Unknown values return an empty string.
+// String returns the canonical name of the provider as reported by
+// mxlFabricsProviderToString. Unknown values return an empty string.
 func (p Provider) String() string {
 	var size C.size_t
 	rc := C.mxlFabricsProviderToString(C.mxlFabricsProvider(p), nil, &size)
@@ -44,17 +47,18 @@ func (p Provider) String() string {
 	return string((*[1 << 30]byte)(buf)[:n:n])
 }
 
-// ParseProvider converts the canonical string form ("auto", "tcp",
-// "verbs", "efa", "shm") into a Provider.
+// ParseProvider converts the canonical string form ("tcp", "verbs",
+// "efa", "shm") into a Provider. The ANY sentinel has no parseable
+// string form.
 func ParseProvider(name string) (Provider, error) {
 	if name == "" {
-		return ProviderAuto, errors.New("mxl/fabrics: empty provider name")
+		return ProviderAny, errors.New("mxl/fabrics: empty provider name")
 	}
 	c := C.CString(name)
 	defer C.free(unsafe.Pointer(c))
 	var p C.mxlFabricsProvider
 	if err := fabricsStatusErr(C.mxlFabricsProviderFromString(c, &p)); err != nil {
-		return ProviderAuto, err
+		return ProviderAny, err
 	}
 	return Provider(p), nil
 }

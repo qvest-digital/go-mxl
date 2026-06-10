@@ -87,9 +87,11 @@ func run(args []string, stderr io.Writer) error {
 	defer tgt.Close()
 
 	info, err := tgt.Setup(fabrics.TargetConfig{
-		Endpoint: fabrics.EndpointAddress{Node: *node, Service: *service},
-		Provider: provider,
-		Writer:   w,
+		Interface: fabrics.InterfaceConfig{
+			Provider: provider,
+			Address:  fabrics.EndpointAddress{Node: *node, Service: *service},
+		},
+		Writer: w,
 	})
 	if err != nil {
 		return fmt.Errorf("Target.Setup: %w", err)
