@@ -19,12 +19,10 @@ import (
 // InitiatorConfig configures the local end of a libmxl-fabrics
 // initiator — the sender of grain transfers to one or more targets.
 type InitiatorConfig struct {
-	// Endpoint is the bind address for the local initiator.
-	Endpoint EndpointAddress
-
-	// Provider selects the libmxl-fabrics provider. Must match the
-	// provider used by the targets the initiator will connect to.
-	Provider Provider
+	// Interface is the local fabric interface to bind: the provider,
+	// its capabilities, and the bind address. The provider must match
+	// the one used by the targets the initiator will connect to.
+	Interface InterfaceConfig
 
 	// Reader is the flow reader whose backing memory is sent to remote
 	// targets. The Initiator pins it for the Initiator lifetime after Setup.
@@ -76,8 +74,8 @@ func (in *Initiator) Setup(cfg InitiatorConfig) error {
 		return ErrClosed()
 	}
 
-	cbuf := cfg.Endpoint.toC()
-	defer cbuf.free()
+	ibuf := cfg.Interface.toC()
+	defer ibuf.free()
 	var copts *C.char
 	if cfg.Options != "" {
 		copts = C.CString(cfg.Options)
@@ -85,10 +83,9 @@ func (in *Initiator) Setup(cfg InitiatorConfig) error {
 	}
 
 	cInitCfg := C.mxlFabricsInitiatorConfig{
-		version:         C.MXL_FABRICS_API_VERSION,
-		endpointAddress: cbuf.addr,
-		provider:        C.mxlFabricsProvider(cfg.Provider),
-		reader:          C.mxlFlowReader(h),
+		version:    C.MXL_FABRICS_API_VERSION,
+		_interface: ibuf.iface,
+		reader:     C.mxlFlowReader(h),
 	}
 
 	rc := C.mxlFabricsInitiatorSetup(in.handle, &cInitCfg, copts)

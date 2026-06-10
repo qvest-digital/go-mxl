@@ -15,9 +15,11 @@ func newTestTargetInfo(t *testing.T) *TargetInfo {
 	}
 	t.Cleanup(func() { tgt.Close() })
 	info, err := tgt.Setup(TargetConfig{
-		Endpoint: EndpointAddress{Node: "127.0.0.1", Service: "0"},
-		Provider: ProviderTCP,
-		Writer:   w,
+		Interface: InterfaceConfig{
+			Provider: ProviderTCP,
+			Address:  EndpointAddress{Node: "127.0.0.1", Service: "0"},
+		},
+		Writer: w,
 	})
 	if err != nil {
 		t.Fatalf("Target.Setup: %v", err)

@@ -102,9 +102,11 @@ func run(args []string, stderr io.Writer) error {
 	defer in.Close()
 
 	if err := in.Setup(fabrics.InitiatorConfig{
-		Endpoint: fabrics.EndpointAddress{Node: *node, Service: *service},
-		Provider: provider,
-		Reader:   r,
+		Interface: fabrics.InterfaceConfig{
+			Provider: provider,
+			Address:  fabrics.EndpointAddress{Node: *node, Service: *service},
+		},
+		Reader: r,
 	}); err != nil {
 		return fmt.Errorf("Initiator.Setup: %w", err)
 	}
