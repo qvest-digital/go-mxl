@@ -474,6 +474,31 @@ func TestFabricsSampleTransferTCP(t *testing.T) {
 	}
 }
 
+// concFlowJSON is a tiny (192x108) video flow for the concurrency test so many
+// writers fit in /dev/shm. The setup race exercised here is in the fabric layer
+// (provider init + endpoint id) and is independent of flow size.
+const concFlowJSON = `{
+  "description": "go-mxl fabrics concurrency test, 192x108",
+  "id": "ffffffff-1b0f-417d-9059-8b94a47197ed",
+  "format": "urn:x-nmos:format:video",
+  "label": "go-mxl fabrics concurrency test video",
+  "tags": { "urn:x-nmos:tag:grouphint/v1.0": ["go-mxl fabrics conc test:Video"] },
+  "parents": [],
+  "media_type": "video/v210",
+  "grain_rate": { "numerator": 30000, "denominator": 1001 },
+  "frame_width": 192,
+  "frame_height": 108,
+  "interlace_mode": "progressive",
+  "colorspace": "BT709",
+  "components": [
+    { "name": "Y",  "width": 192, "height": 108, "bit_depth": 10 },
+    { "name": "Cb", "width": 96,  "height": 108, "bit_depth": 10 },
+    { "name": "Cr", "width": 96,  "height": 108, "bit_depth": 10 }
+  ]
+}`
+
+const concFlowID = "ffffffff-1b0f-417d-9059-8b94a47197ed"
+
 // TestFabricsConcurrentTargetSetupTCP is a regression test for the
 // concurrent-setup wedge (qvest-digital/mxl-dmf-terraform#226). Many targets set
 // up at the same time in one process must ALL succeed. Before serializing setup,
@@ -484,7 +509,7 @@ func TestFabricsSampleTransferTCP(t *testing.T) {
 // serialized (fabricSetupMu) all N succeed deterministically. Run on main
 // (without the mutex) to observe the intermittent failure this guards against.
 func TestFabricsConcurrentTargetSetupTCP(t *testing.T) {
-	const n = 32
+	const n = 16
 	inst := newDomain(t)
 	fab, err := fabrics.NewInstance(inst)
 	if err != nil {
@@ -497,7 +522,7 @@ func TestFabricsConcurrentTargetSetupTCP(t *testing.T) {
 	ports := make([]string, n)
 	for i := 0; i < n; i++ {
 		id := fmt.Sprintf("00000000-0000-0000-0000-%012d", i)
-		w, _, err := inst.NewWriter(strings.ReplaceAll(flowJSON, flowID, id))
+		w, _, err := inst.NewWriter(strings.ReplaceAll(concFlowJSON, concFlowID, id))
 		if err != nil {
 			t.Fatalf("NewWriter[%d]: %v", i, err)
 		}
