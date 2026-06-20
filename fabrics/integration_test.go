@@ -4,9 +4,11 @@ package fabrics_test
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -469,5 +471,95 @@ func TestFabricsSampleTransferTCP(t *testing.T) {
 	}
 	if err := sa2.Cancel(); err != nil {
 		t.Fatalf("tgt Cancel: %v", err)
+	}
+}
+
+// TestFabricsConcurrentTargetSetupTCP is a regression test for the
+// concurrent-setup wedge (qvest-digital/mxl-dmf-terraform#226). Many targets set
+// up at the same time in one process must ALL succeed. Before serializing setup,
+// concurrent libfabric provider init (the first fi_getinfo) and a weakly-seeded
+// endpoint-id RNG could make a setup fail or two endpoints collide, leaving one
+// mirror stuck forever -- an intermittent failure that scaled with the number of
+// concurrent setups (never with 1, ~1/3 of the time with ~9). With setup
+// serialized (fabricSetupMu) all N succeed deterministically. Run on main
+// (without the mutex) to observe the intermittent failure this guards against.
+func TestFabricsConcurrentTargetSetupTCP(t *testing.T) {
+	const n = 32
+	inst := newDomain(t)
+	fab, err := fabrics.NewInstance(inst)
+	if err != nil {
+		t.Fatalf("fabrics.NewInstance: %v", err)
+	}
+	t.Cleanup(func() { fab.Close() })
+
+	// One writer (= one flow, unique id) and one reserved port per target.
+	writers := make([]*mxl.Writer, n)
+	ports := make([]string, n)
+	for i := 0; i < n; i++ {
+		id := fmt.Sprintf("00000000-0000-0000-0000-%012d", i)
+		w, _, err := inst.NewWriter(strings.ReplaceAll(flowJSON, flowID, id))
+		if err != nil {
+			t.Fatalf("NewWriter[%d]: %v", i, err)
+		}
+		writers[i] = w
+		ports[i] = freePort(t)
+	}
+	t.Cleanup(func() {
+		for _, w := range writers {
+			if w != nil {
+				w.Close()
+			}
+		}
+	})
+
+	// Fire every setup from a single release point to maximize overlap.
+	targets := make([]*fabrics.Target, n)
+	infos := make([]*fabrics.TargetInfo, n)
+	errs := make([]error, n)
+	var wg sync.WaitGroup
+	start := make(chan struct{})
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			tg, err := fab.NewTarget()
+			if err != nil {
+				errs[i] = err
+				return
+			}
+			targets[i] = tg
+			infos[i], errs[i] = tg.Setup(fabrics.TargetConfig{
+				Endpoint: fabrics.EndpointAddress{Node: "127.0.0.1", Service: ports[i]},
+				Provider: fabrics.ProviderTCP,
+				Writer:   writers[i],
+			})
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+
+	t.Cleanup(func() {
+		for _, info := range infos {
+			if info != nil {
+				info.Close()
+			}
+		}
+		for _, tg := range targets {
+			if tg != nil {
+				tg.Close()
+			}
+		}
+	})
+
+	failures := 0
+	for i, err := range errs {
+		if err != nil {
+			failures++
+			t.Errorf("concurrent target[%d] setup failed: %v", i, err)
+		}
+	}
+	if failures > 0 {
+		t.Fatalf("%d/%d concurrent target setups failed (want 0)", failures, n)
 	}
 }
