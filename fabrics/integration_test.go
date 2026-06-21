@@ -509,7 +509,10 @@ const concFlowID = "ffffffff-1b0f-417d-9059-8b94a47197ed"
 // serialized (fabricSetupMu) all N succeed deterministically. Run on main
 // (without the mutex) to observe the intermittent failure this guards against.
 func TestFabricsConcurrentTargetSetupTCP(t *testing.T) {
-	const n = 16
+	const (
+		perRound = 16 // concurrent setups per round
+		rounds   = 10 // repeat so the intermittent setup race is exposed reliably
+	)
 	inst := newDomain(t)
 	fab, err := fabrics.NewInstance(inst)
 	if err != nil {
@@ -517,33 +520,43 @@ func TestFabricsConcurrentTargetSetupTCP(t *testing.T) {
 	}
 	t.Cleanup(func() { fab.Close() })
 
-	// One writer (= one flow, unique id) and one reserved port per target.
-	writers := make([]*mxl.Writer, n)
-	ports := make([]string, n)
-	for i := 0; i < n; i++ {
-		id := fmt.Sprintf("00000000-0000-0000-0000-%012d", i)
+	for round := 0; round < rounds; round++ {
+		concurrentSetupRound(t, inst, fab, perRound, round)
+	}
+}
+
+// concurrentSetupRound fires perRound target setups from a single release point
+// and fails if any does not succeed. Writers, targets and infos are released
+// before it returns so /dev/shm and ephemeral ports are freed between rounds.
+func concurrentSetupRound(t *testing.T, inst *mxl.Instance, fab *fabrics.Instance, perRound, round int) {
+	t.Helper()
+
+	writers := make([]*mxl.Writer, perRound)
+	ports := make([]string, perRound)
+	for i := 0; i < perRound; i++ {
+		id := fmt.Sprintf("%08d-0000-0000-0000-%012d", round, i)
 		w, _, err := inst.NewWriter(strings.ReplaceAll(concFlowJSON, concFlowID, id))
 		if err != nil {
-			t.Fatalf("NewWriter[%d]: %v", i, err)
+			t.Fatalf("round %d NewWriter[%d]: %v", round, i, err)
 		}
 		writers[i] = w
 		ports[i] = freePort(t)
 	}
-	t.Cleanup(func() {
+	defer func() {
 		for _, w := range writers {
 			if w != nil {
 				w.Close()
 			}
 		}
-	})
+	}()
 
 	// Fire every setup from a single release point to maximize overlap.
-	targets := make([]*fabrics.Target, n)
-	infos := make([]*fabrics.TargetInfo, n)
-	errs := make([]error, n)
+	targets := make([]*fabrics.Target, perRound)
+	infos := make([]*fabrics.TargetInfo, perRound)
+	errs := make([]error, perRound)
 	var wg sync.WaitGroup
 	start := make(chan struct{})
-	for i := 0; i < n; i++ {
+	for i := 0; i < perRound; i++ {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
@@ -563,8 +576,7 @@ func TestFabricsConcurrentTargetSetupTCP(t *testing.T) {
 	}
 	close(start)
 	wg.Wait()
-
-	t.Cleanup(func() {
+	defer func() {
 		for _, info := range infos {
 			if info != nil {
 				info.Close()
@@ -575,16 +587,11 @@ func TestFabricsConcurrentTargetSetupTCP(t *testing.T) {
 				tg.Close()
 			}
 		}
-	})
+	}()
 
-	failures := 0
 	for i, err := range errs {
 		if err != nil {
-			failures++
-			t.Errorf("concurrent target[%d] setup failed: %v", i, err)
+			t.Fatalf("round %d: concurrent target[%d] setup failed: %v", round, i, err)
 		}
-	}
-	if failures > 0 {
-		t.Fatalf("%d/%d concurrent target setups failed (want 0)", failures, n)
 	}
 }
