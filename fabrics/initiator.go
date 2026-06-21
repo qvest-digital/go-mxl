@@ -91,7 +91,12 @@ func (in *Initiator) Setup(cfg InitiatorConfig) error {
 		reader:          C.mxlFlowReader(h),
 	}
 
+	// Serialize the fabric-side setup process-wide (see fabricSetupMu): the
+	// libmxl-fabrics setup path is not safe to run concurrently with other
+	// target/initiator setups.
+	fabricSetupMu.Lock()
 	rc := C.mxlFabricsInitiatorSetup(in.handle, &cInitCfg, copts)
+	fabricSetupMu.Unlock()
 	if err := fabricsStatusErr(rc); err != nil {
 		return err
 	}

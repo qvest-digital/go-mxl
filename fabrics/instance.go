@@ -13,6 +13,17 @@ import (
 	"github.com/qvest-digital/go-mxl/mxl"
 )
 
+// fabricSetupMu serializes libmxl-fabrics target/initiator Setup across the
+// whole process. The underlying libmxl-fabrics setup is not safe to run
+// concurrently: it draws a per-endpoint id from a freshly, weakly-seeded RNG
+// (under a concurrent setup burst two endpoints can draw the same id, so an
+// initiator's id-keyed dispatch map collapses them and one mirror never
+// connects), and the first fi_getinfo triggers libfabric's lazy, process-global
+// provider init. Setup is not on the steady-state hot path, so serializing it is
+// free in normal operation. Root fix: dmf-mxl/mxl#574; this is the immediate
+// mitigation that needs no libmxl rebuild.
+var fabricSetupMu sync.Mutex
+
 // Instance is a fabrics-level handle bound to an mxl.Instance. Targets
 // and initiators created from this instance can access the flows in
 // the parent MXL domain.

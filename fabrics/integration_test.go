@@ -4,9 +4,11 @@ package fabrics_test
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -469,5 +471,127 @@ func TestFabricsSampleTransferTCP(t *testing.T) {
 	}
 	if err := sa2.Cancel(); err != nil {
 		t.Fatalf("tgt Cancel: %v", err)
+	}
+}
+
+// concFlowJSON is a tiny (192x108) video flow for the concurrency test so many
+// writers fit in /dev/shm. The setup race exercised here is in the fabric layer
+// (provider init + endpoint id) and is independent of flow size.
+const concFlowJSON = `{
+  "description": "go-mxl fabrics concurrency test, 192x108",
+  "id": "ffffffff-1b0f-417d-9059-8b94a47197ed",
+  "format": "urn:x-nmos:format:video",
+  "label": "go-mxl fabrics concurrency test video",
+  "tags": { "urn:x-nmos:tag:grouphint/v1.0": ["go-mxl fabrics conc test:Video"] },
+  "parents": [],
+  "media_type": "video/v210",
+  "grain_rate": { "numerator": 30000, "denominator": 1001 },
+  "frame_width": 192,
+  "frame_height": 108,
+  "interlace_mode": "progressive",
+  "colorspace": "BT709",
+  "components": [
+    { "name": "Y",  "width": 192, "height": 108, "bit_depth": 10 },
+    { "name": "Cb", "width": 96,  "height": 108, "bit_depth": 10 },
+    { "name": "Cr", "width": 96,  "height": 108, "bit_depth": 10 }
+  ]
+}`
+
+const concFlowID = "ffffffff-1b0f-417d-9059-8b94a47197ed"
+
+// TestFabricsConcurrentTargetSetupTCP is a regression test for the
+// concurrent-setup wedge (qvest-digital/mxl-dmf-terraform#226). Many targets set
+// up at the same time in one process must ALL succeed. Before serializing setup,
+// concurrent libfabric provider init (the first fi_getinfo) and a weakly-seeded
+// endpoint-id RNG could make a setup fail or two endpoints collide, leaving one
+// mirror stuck forever -- an intermittent failure that scaled with the number of
+// concurrent setups (never with 1, ~1/3 of the time with ~9). With setup
+// serialized (fabricSetupMu) all N succeed deterministically. Run on main
+// (without the mutex) to observe the intermittent failure this guards against.
+func TestFabricsConcurrentTargetSetupTCP(t *testing.T) {
+	const (
+		perRound = 16 // concurrent setups per round
+		rounds   = 10 // repeat so the intermittent setup race is exposed reliably
+	)
+	inst := newDomain(t)
+	fab, err := fabrics.NewInstance(inst)
+	if err != nil {
+		t.Fatalf("fabrics.NewInstance: %v", err)
+	}
+	t.Cleanup(func() { fab.Close() })
+
+	for round := 0; round < rounds; round++ {
+		concurrentSetupRound(t, inst, fab, perRound, round)
+	}
+}
+
+// concurrentSetupRound fires perRound target setups from a single release point
+// and fails if any does not succeed. Writers, targets and infos are released
+// before it returns so /dev/shm and ephemeral ports are freed between rounds.
+func concurrentSetupRound(t *testing.T, inst *mxl.Instance, fab *fabrics.Instance, perRound, round int) {
+	t.Helper()
+
+	writers := make([]*mxl.Writer, perRound)
+	ports := make([]string, perRound)
+	for i := 0; i < perRound; i++ {
+		id := fmt.Sprintf("%08d-0000-0000-0000-%012d", round, i)
+		w, _, err := inst.NewWriter(strings.ReplaceAll(concFlowJSON, concFlowID, id))
+		if err != nil {
+			t.Fatalf("round %d NewWriter[%d]: %v", round, i, err)
+		}
+		writers[i] = w
+		ports[i] = freePort(t)
+	}
+	defer func() {
+		for _, w := range writers {
+			if w != nil {
+				w.Close()
+			}
+		}
+	}()
+
+	// Fire every setup from a single release point to maximize overlap.
+	targets := make([]*fabrics.Target, perRound)
+	infos := make([]*fabrics.TargetInfo, perRound)
+	errs := make([]error, perRound)
+	var wg sync.WaitGroup
+	start := make(chan struct{})
+	for i := 0; i < perRound; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			tg, err := fab.NewTarget()
+			if err != nil {
+				errs[i] = err
+				return
+			}
+			targets[i] = tg
+			infos[i], errs[i] = tg.Setup(fabrics.TargetConfig{
+				Endpoint: fabrics.EndpointAddress{Node: "127.0.0.1", Service: ports[i]},
+				Provider: fabrics.ProviderTCP,
+				Writer:   writers[i],
+			})
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+	defer func() {
+		for _, info := range infos {
+			if info != nil {
+				info.Close()
+			}
+		}
+		for _, tg := range targets {
+			if tg != nil {
+				tg.Close()
+			}
+		}
+	}()
+
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("round %d: concurrent target[%d] setup failed: %v", round, i, err)
+		}
 	}
 }

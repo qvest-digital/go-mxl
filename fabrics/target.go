@@ -95,7 +95,13 @@ func (t *Target) Setup(cfg TargetConfig) (*TargetInfo, error) {
 	}
 
 	var info C.mxlFabricsTargetInfo
-	if err := fabricsStatusErr(C.mxlFabricsTargetSetup(t.handle, &cTargetCfg, copts, &info)); err != nil {
+	// Serialize the fabric-side setup process-wide (see fabricSetupMu): the
+	// libmxl-fabrics setup path is not safe to run concurrently with other
+	// target/initiator setups.
+	fabricSetupMu.Lock()
+	rc := C.mxlFabricsTargetSetup(t.handle, &cTargetCfg, copts, &info)
+	fabricSetupMu.Unlock()
+	if err := fabricsStatusErr(rc); err != nil {
 		return nil, err
 	}
 	t.writer = cfg.Writer
