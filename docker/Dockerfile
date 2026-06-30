@@ -26,7 +26,7 @@
 # tcp, udp, and shm are all compiled in.
 
 ARG GO_VERSION=1.26.0
-ARG DEBIAN_TAG=trixie-20260518
+ARG DEBIAN_TAG=trixie-20260623
 
 # renovate: datasource=github-releases depName=linux-rdma/rdma-core
 ARG RDMA_CORE_VERSION=v63.0
