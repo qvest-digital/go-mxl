@@ -19,11 +19,9 @@ import (
 // TargetConfig configures the local end of a libmxl-fabrics target —
 // the receiver of grain transfers from one or more initiators.
 type TargetConfig struct {
-	// Endpoint is the bind address for the local target.
-	Endpoint EndpointAddress
-
-	// Provider selects the libmxl-fabrics provider.
-	Provider Provider
+	// Interface is the local fabric interface to bind: the provider,
+	// its capabilities, and the bind address.
+	Interface InterfaceConfig
 
 	// Writer is the flow writer whose backing memory receives incoming
 	// transfers. The Target pins it for the Target lifetime after Setup.
@@ -79,8 +77,8 @@ func (t *Target) Setup(cfg TargetConfig) (*TargetInfo, error) {
 		return nil, ErrClosed()
 	}
 
-	cbuf := cfg.Endpoint.toC()
-	defer cbuf.free()
+	ibuf := cfg.Interface.toC()
+	defer ibuf.free()
 	var copts *C.char
 	if cfg.Options != "" {
 		copts = C.CString(cfg.Options)
@@ -88,10 +86,9 @@ func (t *Target) Setup(cfg TargetConfig) (*TargetInfo, error) {
 	}
 
 	cTargetCfg := C.mxlFabricsTargetConfig{
-		version:         C.MXL_FABRICS_API_VERSION,
-		endpointAddress: cbuf.addr,
-		provider:        C.mxlFabricsProvider(cfg.Provider),
-		writer:          C.mxlFlowWriter(h),
+		version:    C.MXL_FABRICS_API_VERSION,
+		_interface: ibuf.iface,
+		writer:     C.mxlFlowWriter(h),
 	}
 
 	var info C.mxlFabricsTargetInfo
