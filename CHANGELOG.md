@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.0.0-rc.10](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.9...v1.0.0-rc.10) (2026-06-30)
+
+
+### Dependencies
+
+* **actions:** update github actions to v7 ([#65](https://github.com/qvest-digital/go-mxl/issues/65)) ([1c282f7](https://github.com/qvest-digital/go-mxl/commit/1c282f729a1265a310670ee3e134b033be34fd86))
+
+
+### Continuous Integration
+
+* add ci-summary branch-protection gate ([#61](https://github.com/qvest-digital/go-mxl/issues/61)) ([9044401](https://github.com/qvest-digital/go-mxl/commit/9044401e99df3bdefcb6c721788fc04c2b289716))
+* align release-please/renovate with mxl-k8s ([#60](https://github.com/qvest-digital/go-mxl/issues/60)) ([ae67c80](https://github.com/qvest-digital/go-mxl/commit/ae67c801591b050b51f6efce673a7b71682eec21))
+
+
+### Miscellaneous
+
+* **deps:** update debian docker tag to trixie-20260623 ([#63](https://github.com/qvest-digital/go-mxl/issues/63)) ([ad4c24f](https://github.com/qvest-digital/go-mxl/commit/ad4c24f310d81f73ce3157039ddef57fdb214b8f))
+* **deps:** update docker/dockerfile docker tag to v1.25 ([#66](https://github.com/qvest-digital/go-mxl/issues/66)) ([47ee0e5](https://github.com/qvest-digital/go-mxl/commit/47ee0e5f74300f68566b34421a057834d967ce62))
+* gitignore and untrack graphify-out ([#58](https://github.com/qvest-digital/go-mxl/issues/58)) ([3d3ec53](https://github.com/qvest-digital/go-mxl/commit/3d3ec53d0dfb65380e4b0c47950c4eee3c452405))
+
 ## [1.0.0-rc.9](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.8...v1.0.0-rc.9) (2026-06-01)
 
 
