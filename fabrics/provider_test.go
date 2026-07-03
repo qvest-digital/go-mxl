@@ -5,7 +5,7 @@ import (
 )
 
 func TestProviderStringNonEmpty(t *testing.T) {
-	cases := []Provider{ProviderAuto, ProviderTCP, ProviderVerbs, ProviderEFA, ProviderSHM}
+	cases := []Provider{ProviderAny, ProviderTCP, ProviderVerbs, ProviderEFA, ProviderSHM}
 	seen := map[string]Provider{}
 	for _, p := range cases {
 		s := p.String()
@@ -20,9 +20,15 @@ func TestProviderStringNonEmpty(t *testing.T) {
 	}
 }
 
+func TestProviderAnyString(t *testing.T) {
+	if got := ProviderAny.String(); got != "any" {
+		t.Fatalf("ProviderAny.String() = %q, want %q", got, "any")
+	}
+}
+
 func TestProviderRoundTrip(t *testing.T) {
 	// libmxl-fabrics' string parser only accepts the concrete providers;
-	// the AUTO sentinel stringifies to "auto" but does not parse back.
+	// the ANY sentinel stringifies to "any" but does not parse back.
 	cases := []Provider{ProviderTCP, ProviderVerbs, ProviderEFA, ProviderSHM}
 	for _, p := range cases {
 		s := p.String()
@@ -37,9 +43,9 @@ func TestProviderRoundTrip(t *testing.T) {
 	}
 }
 
-func TestParseProviderAuto(t *testing.T) {
-	if _, err := ParseProvider("auto"); err == nil {
-		t.Fatal("libmxl-fabrics started accepting \"auto\" — update Provider docs")
+func TestParseProviderAny(t *testing.T) {
+	if _, err := ParseProvider("any"); err == nil {
+		t.Fatal("libmxl-fabrics started accepting \"any\" -- update Provider docs")
 	}
 }
 

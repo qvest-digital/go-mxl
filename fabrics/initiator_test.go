@@ -69,9 +69,11 @@ func TestInitiatorSetupNilReader(t *testing.T) {
 	}
 	t.Cleanup(func() { in.Close() })
 	err = in.Setup(InitiatorConfig{
-		Endpoint: EndpointAddress{Node: "127.0.0.1", Service: "0"},
-		Provider: ProviderTCP,
-		Reader:   nil,
+		Interface: InterfaceConfig{
+			Provider: ProviderTCP,
+			Address:  EndpointAddress{Node: "127.0.0.1", Service: "0"},
+		},
+		Reader: nil,
 	})
 	if !errors.Is(err, mxl.ErrInvalidArg) {
 		t.Fatalf("Setup(nil Reader): %v, want ErrInvalidArg", err)
@@ -93,9 +95,11 @@ func TestInitiatorSetupClosedReader(t *testing.T) {
 	}
 	t.Cleanup(func() { in.Close() })
 	err = in.Setup(InitiatorConfig{
-		Endpoint: EndpointAddress{Node: "127.0.0.1", Service: "0"},
-		Provider: ProviderTCP,
-		Reader:   r,
+		Interface: InterfaceConfig{
+			Provider: ProviderTCP,
+			Address:  EndpointAddress{Node: "127.0.0.1", Service: "0"},
+		},
+		Reader: r,
 	})
 	if !errors.Is(err, mxl.ErrClosed) {
 		t.Fatalf("Setup(closed Reader): %v, want ErrClosed", err)
@@ -134,9 +138,11 @@ func TestInitiatorAddTargetClosedInfo(t *testing.T) {
 	}
 	t.Cleanup(func() { tgt.Close() })
 	info, err := tgt.Setup(TargetConfig{
-		Endpoint: EndpointAddress{Node: "127.0.0.1", Service: "0"},
-		Provider: ProviderTCP,
-		Writer:   w,
+		Interface: InterfaceConfig{
+			Provider: ProviderTCP,
+			Address:  EndpointAddress{Node: "127.0.0.1", Service: "0"},
+		},
+		Writer: w,
 	})
 	if err != nil {
 		t.Fatalf("Target.Setup: %v", err)
@@ -164,8 +170,10 @@ func TestInitiatorMethodsAfterClose(t *testing.T) {
 	}
 
 	if err := in.Setup(InitiatorConfig{
-		Endpoint: EndpointAddress{Node: "127.0.0.1", Service: "0"},
-		Provider: ProviderTCP,
+		Interface: InterfaceConfig{
+			Provider: ProviderTCP,
+			Address:  EndpointAddress{Node: "127.0.0.1", Service: "0"},
+		},
 	}); !errors.Is(err, mxl.ErrClosed) {
 		t.Errorf("Setup after Close: %v, want ErrClosed", err)
 	}

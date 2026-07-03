@@ -1,6 +1,6 @@
 // Package fabrics wraps libmxl-fabrics, the cross-node transport
 // layer of libmxl. It exposes Instance, Target, and Initiator
-// handles and the Provider enum (auto/tcp/verbs/efa/shm). A Target
+// handles and the Provider enum (any/tcp/verbs/efa/shm). A Target
 // receives grains or samples into a FlowWriter; an Initiator sends a
 // FlowReader's grains or samples to one or more targets.
 //

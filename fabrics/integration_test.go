@@ -133,9 +133,11 @@ func TestFabricsGrainTransferTCP(t *testing.T) {
 	initiatorPort := freePort(t)
 
 	info, err := target.Setup(fabrics.TargetConfig{
-		Endpoint: fabrics.EndpointAddress{Node: "127.0.0.1", Service: targetPort},
-		Provider: fabrics.ProviderTCP,
-		Writer:   tgtWriter,
+		Interface: fabrics.InterfaceConfig{
+			Provider: fabrics.ProviderTCP,
+			Address:  fabrics.EndpointAddress{Node: "127.0.0.1", Service: targetPort},
+		},
+		Writer: tgtWriter,
 	})
 	if err != nil {
 		t.Fatalf("Target.Setup: %v", err)
@@ -148,9 +150,11 @@ func TestFabricsGrainTransferTCP(t *testing.T) {
 	}
 	t.Cleanup(func() { initiator.Close() })
 	if err := initiator.Setup(fabrics.InitiatorConfig{
-		Endpoint: fabrics.EndpointAddress{Node: "127.0.0.1", Service: initiatorPort},
-		Provider: fabrics.ProviderTCP,
-		Reader:   srcReader,
+		Interface: fabrics.InterfaceConfig{
+			Provider: fabrics.ProviderTCP,
+			Address:  fabrics.EndpointAddress{Node: "127.0.0.1", Service: initiatorPort},
+		},
+		Reader: srcReader,
 	}); err != nil {
 		t.Fatalf("Initiator.Setup: %v", err)
 	}
@@ -313,9 +317,11 @@ func TestFabricsSampleTransferTCP(t *testing.T) {
 	initiatorPort := freePort(t)
 
 	info, err := target.Setup(fabrics.TargetConfig{
-		Endpoint: fabrics.EndpointAddress{Node: "127.0.0.1", Service: targetPort},
-		Provider: fabrics.ProviderTCP,
-		Writer:   tgtWriter,
+		Interface: fabrics.InterfaceConfig{
+			Provider: fabrics.ProviderTCP,
+			Address:  fabrics.EndpointAddress{Node: "127.0.0.1", Service: targetPort},
+		},
+		Writer: tgtWriter,
 	})
 	if err != nil {
 		t.Fatalf("Target.Setup: %v", err)
@@ -328,9 +334,11 @@ func TestFabricsSampleTransferTCP(t *testing.T) {
 	}
 	t.Cleanup(func() { initiator.Close() })
 	if err := initiator.Setup(fabrics.InitiatorConfig{
-		Endpoint: fabrics.EndpointAddress{Node: "127.0.0.1", Service: initiatorPort},
-		Provider: fabrics.ProviderTCP,
-		Reader:   srcReader,
+		Interface: fabrics.InterfaceConfig{
+			Provider: fabrics.ProviderTCP,
+			Address:  fabrics.EndpointAddress{Node: "127.0.0.1", Service: initiatorPort},
+		},
+		Reader: srcReader,
 	}); err != nil {
 		t.Fatalf("Initiator.Setup: %v", err)
 	}

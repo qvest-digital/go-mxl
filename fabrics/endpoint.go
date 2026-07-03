@@ -10,8 +10,8 @@ import "unsafe"
 
 // EndpointAddress is the bind address for a libmxl-fabrics endpoint,
 // modelled on hostname/port pairs. The actual values vary by provider
-// (for TCP this is an IP and port; for verbs it can be similar; the
-// AUTO provider may accept empty strings).
+// (for TCP this is an IP and port). Empty fields map to NULL on the
+// C side.
 type EndpointAddress struct {
 	// Node is the address part (typically an IP).
 	Node string
