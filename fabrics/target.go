@@ -29,6 +29,12 @@ type TargetConfig struct {
 
 	// Options is a JSON-formatted options string passed through to
 	// libmxl-fabrics. Leave empty for the default options.
+	//
+	// Recognized field: "cqDepth" (number >= 1), the depth of the
+	// target's completion queue. libmxl-fabrics documents raising it
+	// for high-frame-rate or many-stream receivers, or where
+	// per-completion processing is slow, to keep the completion queue
+	// from overflowing. Omitted leaves the implementation default.
 	Options string
 }
 
@@ -77,7 +83,7 @@ func (t *Target) Setup(cfg TargetConfig) (*TargetInfo, error) {
 		return nil, ErrClosed()
 	}
 
-	ibuf := cfg.Interface.toC()
+	ibuf := cfg.Interface.requireTransferCap().toC()
 	defer ibuf.free()
 	var copts *C.char
 	if cfg.Options != "" {

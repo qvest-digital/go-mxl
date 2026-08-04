@@ -39,7 +39,10 @@ type InterfaceCaps struct {
 type InterfaceConfig struct {
 	// Provider selects the libmxl-fabrics provider.
 	Provider Provider
-	// Caps are the interface capabilities.
+	// Caps are the interface capabilities. GetInterfaces reports them;
+	// Target.Setup and Initiator.Setup read them as requirements, and
+	// supply a remote-write requirement when Flags carries no transfer
+	// capability. MaxMessageSize is ignored on setup.
 	Caps InterfaceCaps
 	// Address is the node/service address of the interface.
 	Address EndpointAddress
@@ -51,6 +54,26 @@ type InterfaceConfig struct {
 type ifaceCBuf struct {
 	iface C.mxlFabricsInterfaceConfig
 	addr  *endpointCBuf
+}
+
+// requireTransferCap returns c with a transfer capability set.
+//
+// libmxl-fabrics used to accept a setup carrying no transfer
+// capability and default it to remote write; it now rejects one with
+// "Missing transfer capability". The binding applies the same default
+// so the requirement does not land on every caller, and remote write
+// is the only choice available: the setup path still refuses anything
+// that does not include it.
+//
+// Applied on the setup paths only. mxlFabricsGetInterfaces ignores
+// capability flags in its query, so defaulting them there would
+// suggest a filter that does not exist.
+func (c InterfaceConfig) requireTransferCap() InterfaceConfig {
+	const transfer = InterfaceCapRemoteWrite | InterfaceCapSendReceive
+	if c.Caps.Flags&transfer == 0 {
+		c.Caps.Flags |= InterfaceCapRemoteWrite
+	}
+	return c
 }
 
 func (c InterfaceConfig) toC() *ifaceCBuf {

@@ -74,7 +74,7 @@ func (in *Initiator) Setup(cfg InitiatorConfig) error {
 		return ErrClosed()
 	}
 
-	ibuf := cfg.Interface.toC()
+	ibuf := cfg.Interface.requireTransferCap().toC()
 	defer ibuf.free()
 	var copts *C.char
 	if cfg.Options != "" {

@@ -27,9 +27,7 @@ func TestProviderAnyString(t *testing.T) {
 }
 
 func TestProviderRoundTrip(t *testing.T) {
-	// libmxl-fabrics' string parser only accepts the concrete providers;
-	// the ANY sentinel stringifies to "any" but does not parse back.
-	cases := []Provider{ProviderTCP, ProviderVerbs, ProviderEFA, ProviderSHM}
+	cases := []Provider{ProviderAny, ProviderTCP, ProviderVerbs, ProviderEFA, ProviderSHM}
 	for _, p := range cases {
 		s := p.String()
 		got, err := ParseProvider(s)
@@ -44,8 +42,16 @@ func TestProviderRoundTrip(t *testing.T) {
 }
 
 func TestParseProviderAny(t *testing.T) {
-	if _, err := ParseProvider("any"); err == nil {
-		t.Fatal("libmxl-fabrics started accepting \"any\" -- update Provider docs")
+	// "any" gained a parseable form in libmxl-fabrics after
+	// v1.1.0-beta-1. It names every provider rather than selecting one,
+	// so callers that treat a parse failure as "this is not a concrete
+	// provider" need their own check.
+	got, err := ParseProvider("any")
+	if err != nil {
+		t.Fatalf("ParseProvider(\"any\"): %v", err)
+	}
+	if got != ProviderAny {
+		t.Fatalf("ParseProvider(\"any\") = %d, want ProviderAny (%d)", got, ProviderAny)
 	}
 }
 
