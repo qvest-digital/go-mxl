@@ -31,6 +31,13 @@ type Writer struct {
 	parent *Instance // pinned to keep the instance alive until Close
 	handle C.mxlFlowWriter
 	config FlowConfig
+
+	// dataPath is <domain>/<id>.mxl-flow/data, the file libmxl deletes
+	// the flow by. guard holds a shared lock on it; see flowGuard.
+	// Both are empty/nil when the file could not be opened, which
+	// leaves the writer behaving as it did before guards existed.
+	dataPath string
+	guard    *flowGuard
 }
 
 // NewWriter creates or opens a flow writer for the given JSON flow definition.
@@ -73,6 +80,16 @@ func (i *Instance) NewWriterOpts(flowDef, options string) (*Writer, bool, error)
 		handle: h,
 		config: goFlowConfig(&cfg),
 	}
+	// Taken now rather than at release time so the guard is pinned to
+	// the file this writer opened. Acquiring it later would pin
+	// whatever the path resolves to then, which is the wrong file in
+	// precisely the case the guard exists for. A failure here is not
+	// fatal: it costs Detach, not the writer.
+	w.dataPath = flowDataPath(i.domain, uuidString(w.config.Common.ID))
+	if g, err := newFlowGuard(w.dataPath); err == nil {
+		w.guard = g
+		i.addGuard(g)
+	}
 	runtime.SetFinalizer(w, func(w *Writer) { _ = w.Close() })
 	return w, bool(created), nil
 }
@@ -80,18 +97,67 @@ func (i *Instance) NewWriterOpts(flowDef, options string) (*Writer, bool, error)
 // Close releases the underlying flow writer. Any in-progress OpenGrain or
 // OpenSamples is silently dropped by libmxl; callers should call Cancel or
 // Commit first to keep grain state predictable. Safe to call multiple times.
+//
+// libmxl removes the flow from the domain when the writer being released
+// is its last holder. Close keeps that behaviour, with one exception: it
+// does not offer the flow for deletion when the flow directory no longer
+// holds the file this writer opened. libmxl decides on the writer's own
+// descriptor but deletes by path, so once the directory has been
+// replaced the two name different flows and the delete would fall on
+// whichever one holds the path now.
+//
+// Use Detach to release a writer without offering the flow at all.
 func (w *Writer) Close() error {
+	return w.release(w.guard != nil && !w.guard.pathStillOurs(w.dataPath))
+}
+
+// Detach releases the underlying flow writer and leaves the flow in the
+// domain, whether or not this writer was its last holder. Use it where
+// something other than this writer owns the flow's lifetime.
+//
+// Returns ErrNoFlowGuard without releasing anything when the writer has
+// no guard on its data file, because then the release cannot be kept
+// from deleting the flow. Safe to call multiple times.
+func (w *Writer) Detach() error {
+	w.mu.Lock()
+	held := w.handle != nil
+	missing := w.guard == nil
+	w.mu.Unlock()
+	if held && missing {
+		return ErrNoFlowGuard
+	}
+	return w.release(true)
+}
+
+// release hands the writer back to libmxl. With keep set, the guard is
+// still held when libmxl tries to upgrade the writer's descriptor to an
+// exclusive lock, so the upgrade fails and the flow survives; without
+// it, the guard is dropped first and libmxl deletes the flow if this
+// writer was the last holder.
+func (w *Writer) release(keep bool) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if w.handle == nil {
 		return nil
 	}
-	w.parent.mu.RLock()
-	defer w.parent.mu.RUnlock()
-	var rc C.mxlStatus = C.MXL_STATUS_OK
-	if w.parent.handle != nil {
-		rc = C.mxlReleaseFlowWriter(w.parent.handle, w.handle)
+	inst := w.parent
+	if !keep {
+		inst.dropGuard(w.guard)
+		w.guard = nil
 	}
+
+	inst.mu.RLock()
+	var rc C.mxlStatus = C.MXL_STATUS_OK
+	if inst.handle != nil {
+		rc = C.mxlReleaseFlowWriter(inst.handle, w.handle)
+	}
+	inst.mu.RUnlock()
+
+	// Dropped only now on the keeping path: the lock has to outlive
+	// libmxl's attempt to upgrade it, which is what the release above
+	// makes.
+	inst.dropGuard(w.guard)
+	w.guard = nil
 	w.handle = nil
 	w.parent = nil
 	runtime.SetFinalizer(w, nil)

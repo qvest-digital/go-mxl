@@ -57,6 +57,18 @@ func IsTmpFs(path string) (bool, error) {
 type Instance struct {
 	mu     sync.RWMutex
 	handle C.mxlInstance // nil after Close
+	domain string
+
+	// guardMu guards guards. It is deliberately separate from mu: a
+	// Writer registers and drops its guard while holding its own lock
+	// and taking mu for read, so sharing one lock would invert the
+	// order between the two paths.
+	guardMu sync.Mutex
+	// guards holds every live writer guard on this instance. libmxl
+	// does not know about them, so releasing an instance with writers
+	// still attached has to drop them here or their descriptors keep
+	// the flow files allocated after the domain directory is gone.
+	guards map[*flowGuard]struct{}
 }
 
 // NewInstance opens an MXL domain at the given filesystem path. The path must
@@ -78,7 +90,7 @@ func NewInstance(domain, options string) (*Instance, error) {
 		return nil, errors.New("mxl: mxlCreateInstance returned NULL")
 	}
 
-	inst := &Instance{handle: h}
+	inst := &Instance{handle: h, domain: domain}
 	runtime.SetFinalizer(inst, func(i *Instance) { _ = i.Close() })
 	return inst, nil
 }
@@ -91,6 +103,10 @@ func (i *Instance) Close() error {
 	if i.handle == nil {
 		return nil
 	}
+	// Before libmxl runs its own cleanup: the destructor deletes the
+	// flow of every writer still attached, and it can only do that
+	// while nothing holds a shared lock on the flow's data file.
+	i.releaseGuards()
 	rc := C.mxlDestroyInstance(i.handle)
 	i.handle = nil
 	runtime.SetFinalizer(i, nil)
@@ -158,6 +174,45 @@ func (i *Instance) FlowDef(flowID string) (string, error) {
 		n--
 	}
 	return string((*[1 << 30]byte)(buf)[:n:n]), nil
+}
+
+// addGuard registers a writer guard so Close can drop it if the writer
+// is still attached then.
+func (i *Instance) addGuard(g *flowGuard) {
+	i.guardMu.Lock()
+	defer i.guardMu.Unlock()
+	if i.guards == nil {
+		i.guards = make(map[*flowGuard]struct{})
+	}
+	i.guards[g] = struct{}{}
+}
+
+// dropGuard releases g and forgets it. Safe with a guard this instance
+// no longer tracks.
+func (i *Instance) dropGuard(g *flowGuard) {
+	if g == nil {
+		return
+	}
+	i.guardMu.Lock()
+	delete(i.guards, g)
+	i.guardMu.Unlock()
+	_ = g.release()
+}
+
+// releaseGuards drops every guard still registered.
+func (i *Instance) releaseGuards() {
+	i.guardMu.Lock()
+	live := i.guards
+	i.guards = nil
+	i.guardMu.Unlock()
+	for g := range live {
+		_ = g.release()
+	}
+}
+
+// Domain returns the filesystem path this instance was opened on.
+func (i *Instance) Domain() string {
+	return i.domain
 }
 
 // rawHandle returns the underlying C handle if the instance is still open.
