@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0-rc.11](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.10...v1.0.0-rc.11) (2026-08-04)
+
+
+### Features
+
+* **mxl:** add Writer.Detach ([#71](https://github.com/qvest-digital/go-mxl/issues/71)) ([50385a9](https://github.com/qvest-digital/go-mxl/commit/50385a9838ce4fc26235230802721eb57792f07e))
+
 ## [1.0.0-rc.10](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.9...v1.0.0-rc.10) (2026-07-03)
 
 
