@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0-rc.13](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.12...v1.0.0-rc.13) (2026-08-04)
+
+
+### Features
+
+* **fabrics:** wrap interface enumeration ([#75](https://github.com/qvest-digital/go-mxl/issues/75)) ([f68b91a](https://github.com/qvest-digital/go-mxl/commit/f68b91ac952f5518374a96482bffbabda9099da7))
+
 ## [1.0.0-rc.12](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.11...v1.0.0-rc.12) (2026-08-04)
 
 
