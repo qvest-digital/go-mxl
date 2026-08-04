@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0-rc.12](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.11...v1.0.0-rc.12) (2026-08-04)
+
+
+### Bug Fixes
+
+* **fabrics:** default the transfer capability on setup ([#73](https://github.com/qvest-digital/go-mxl/issues/73)) ([d48cf69](https://github.com/qvest-digital/go-mxl/commit/d48cf6932626056be00eab50a001f98578c7d01d))
+
 ## [1.0.0-rc.11](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.10...v1.0.0-rc.11) (2026-08-04)
 
 
