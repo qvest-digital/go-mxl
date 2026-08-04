@@ -16,9 +16,11 @@ import (
 type Provider int
 
 const (
-	// ProviderAny lets libmxl-fabrics select a provider. Per the
-	// libmxl-fabrics header this may not be supported by all
-	// implementations and currently always falls back to TCP.
+	// ProviderAny names every provider rather than selecting one. The
+	// libmxl-fabrics header gives it as an input to interface
+	// enumeration, where it means "do not filter by provider"; it
+	// carried an auto-select reading that fell back to TCP until
+	// v1.1.0-beta-1, and no longer does.
 	ProviderAny   Provider = C.MXL_FABRICS_PROVIDER_ANY
 	ProviderTCP   Provider = C.MXL_FABRICS_PROVIDER_TCP
 	ProviderVerbs Provider = C.MXL_FABRICS_PROVIDER_VERBS
@@ -47,9 +49,10 @@ func (p Provider) String() string {
 	return string((*[1 << 30]byte)(buf)[:n:n])
 }
 
-// ParseProvider converts the canonical string form ("tcp", "verbs",
-// "efa", "shm") into a Provider. The ANY sentinel has no parseable
-// string form.
+// ParseProvider converts the canonical string form ("any", "tcp",
+// "verbs", "efa", "shm") into a Provider. "any" parses to ProviderAny,
+// which names no single provider -- see its documentation before
+// passing the result to a setup function.
 func ParseProvider(name string) (Provider, error) {
 	if name == "" {
 		return ProviderAny, errors.New("mxl/fabrics: empty provider name")
