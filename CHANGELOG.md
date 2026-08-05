@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.0.0-rc.14](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.13...v1.0.0-rc.14) (2026-08-05)
+
+
+### Features
+
+* **fabrics:** expose the interface attr document ([#77](https://github.com/qvest-digital/go-mxl/issues/77)) ([71724de](https://github.com/qvest-digital/go-mxl/commit/71724dec4fdf6f1fa169adeaeef26ffe8d4ba214))
+
+
+### Miscellaneous
+
+* **deps:** update debian docker tag to trixie-20260713 ([#69](https://github.com/qvest-digital/go-mxl/issues/69)) ([7f411a6](https://github.com/qvest-digital/go-mxl/commit/7f411a690f8219482a85c3279a25e55161cd6174))
+* **deps:** update docker/dockerfile docker tag to v1.26 ([#70](https://github.com/qvest-digital/go-mxl/issues/70)) ([4f105db](https://github.com/qvest-digital/go-mxl/commit/4f105db7ac1f80d2ed933364b318cb377ca662c4))
+
 ## [1.0.0-rc.13](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.12...v1.0.0-rc.13) (2026-08-04)
 
 
