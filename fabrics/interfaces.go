@@ -18,7 +18,9 @@ import "C"
 //
 // The returned Caps and Address are what a setup expects to be handed
 // back: they carry the provider's own view of the interface, including
-// the MaxMessageSize a caller has no other way to learn.
+// the MaxMessageSize a caller has no other way to learn. Attr carries
+// the provider's description of the device behind the interface and is
+// only ever populated here.
 func (i *Instance) Interfaces(query *InterfaceConfig) ([]InterfaceConfig, error) {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
@@ -69,6 +71,7 @@ func interfaceConfigFromC(c *C.mxlFabricsInterfaceConfig) InterfaceConfig {
 			Node:    goStringOrEmpty(c.address.node),
 			Service: goStringOrEmpty(c.address.service),
 		},
+		Attr: goStringOrEmpty(c.attr),
 	}
 }
 

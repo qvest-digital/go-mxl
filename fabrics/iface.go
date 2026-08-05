@@ -33,9 +33,7 @@ type InterfaceCaps struct {
 
 // InterfaceConfig identifies the local fabric interface for a Target
 // or Initiator setup, mirroring the C mxlFabricsInterfaceConfig
-// struct. The C struct's attr field is filled in by libmxl-fabrics
-// when it enumerates interfaces and ignored by the setup functions;
-// it has no Go counterpart.
+// struct.
 type InterfaceConfig struct {
 	// Provider selects the libmxl-fabrics provider.
 	Provider Provider
@@ -46,6 +44,17 @@ type InterfaceConfig struct {
 	Caps InterfaceCaps
 	// Address is the node/service address of the interface.
 	Address EndpointAddress
+	// Attr is the JSON document libmxl-fabrics fills in when it
+	// enumerates interfaces, describing the underlying device. The
+	// header calls it best-effort: which keys are present depends on
+	// the platform, the provider and the hardware, and it is empty
+	// when the provider reports nothing. Setup ignores it, so a value
+	// here never reaches the C setup functions.
+	//
+	// Kept as the raw document rather than a typed struct: the schema
+	// is libmxl-fabrics', not this binding's, and a Go type would
+	// claim a stability the header does not offer.
+	Attr string
 }
 
 // ifaceCBuf bundles a C-side mxlFabricsInterfaceConfig with the C
@@ -84,6 +93,9 @@ func (c InterfaceConfig) toC() *ifaceCBuf {
 	buf.iface.caps.flags = C.uint64_t(c.Caps.Flags)
 	buf.iface.caps.maxMessageSize = C.uint64_t(c.Caps.MaxMessageSize)
 	buf.iface.address = buf.addr.addr
+	// Attr is enumeration output. The setup functions ignore the C
+	// field, so passing one back would allocate a string nothing
+	// reads.
 	buf.iface.attr = nil
 	return buf
 }
