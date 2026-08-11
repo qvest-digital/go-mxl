@@ -47,7 +47,23 @@ const (
 	StatusErrConflict         Status = C.MXL_ERR_CONFLICT
 	StatusErrPermissionDenied Status = C.MXL_ERR_PERMISSION_DENIED
 	StatusErrFlowInvalid      Status = C.MXL_ERR_FLOW_INVALID
-	StatusErrNotReady         Status = C.MXL_ERR_NOT_READY
+)
+
+// The fabrics half of mxlStatus, numbered from 1024. libmxl-fabrics
+// returns these through the same mxlStatus type as the flow API, so a
+// caller that only names the flow half sees them as unrecognized
+// integers and cannot tell a retryable interruption from a dead
+// endpoint.
+const (
+	StatusErrStrLen               Status = C.MXL_ERR_STRLEN
+	StatusErrInterrupted          Status = C.MXL_ERR_INTERRUPTED
+	StatusErrNoFabric             Status = C.MXL_ERR_NO_FABRIC
+	StatusErrInvalidState         Status = C.MXL_ERR_INVALID_STATE
+	StatusErrInternal             Status = C.MXL_ERR_INTERNAL
+	StatusErrNotReady             Status = C.MXL_ERR_NOT_READY
+	StatusErrNotFound             Status = C.MXL_ERR_NOT_FOUND
+	StatusErrExists               Status = C.MXL_ERR_EXISTS
+	StatusErrUnsupportedOperation Status = C.MXL_ERR_UNSUPPORTED_OPERATION
 )
 
 // Sentinel errors. Compare with errors.Is. The Status values themselves also
@@ -64,6 +80,17 @@ var (
 	ErrConflict         = StatusErrConflict
 	ErrPermissionDenied = StatusErrPermissionDenied
 	ErrFlowInvalid      = StatusErrFlowInvalid
+
+	// Fabrics half. ErrNotReady keeps its home in the fabrics package,
+	// which wraps it in a type that also matches this status.
+	ErrStrLen               = StatusErrStrLen
+	ErrInterrupted          = StatusErrInterrupted
+	ErrNoFabric             = StatusErrNoFabric
+	ErrInvalidState         = StatusErrInvalidState
+	ErrInternal             = StatusErrInternal
+	ErrNotFound             = StatusErrNotFound
+	ErrExists               = StatusErrExists
+	ErrUnsupportedOperation = StatusErrUnsupportedOperation
 )
 
 // ErrClosed is returned by methods called on a handle after Close.
@@ -93,8 +120,24 @@ func (s Status) Error() string {
 		return "mxl: permission denied"
 	case StatusErrFlowInvalid:
 		return "mxl: flow invalid (replaced by writer)"
+	case StatusErrStrLen:
+		return "mxl: string buffer too small"
+	case StatusErrInterrupted:
+		return "mxl: interrupted"
+	case StatusErrNoFabric:
+		return "mxl: no fabric"
+	case StatusErrInvalidState:
+		return "mxl: invalid state"
+	case StatusErrInternal:
+		return "mxl: internal error"
 	case StatusErrNotReady:
 		return "mxl: not ready"
+	case StatusErrNotFound:
+		return "mxl: not found"
+	case StatusErrExists:
+		return "mxl: already exists"
+	case StatusErrUnsupportedOperation:
+		return "mxl: unsupported operation"
 	case StatusErrUnknown:
 		return "mxl: unknown error"
 	default:
@@ -119,7 +162,15 @@ func (s Status) known() bool {
 		StatusErrConflict,
 		StatusErrPermissionDenied,
 		StatusErrFlowInvalid,
-		StatusErrNotReady:
+		StatusErrStrLen,
+		StatusErrInterrupted,
+		StatusErrNoFabric,
+		StatusErrInvalidState,
+		StatusErrInternal,
+		StatusErrNotReady,
+		StatusErrNotFound,
+		StatusErrExists,
+		StatusErrUnsupportedOperation:
 		return true
 	}
 	return false
