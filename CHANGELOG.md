@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.0-rc.15](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.14...v1.0.0-rc.15) (2026-08-11)
+
+
+### Features
+
+* **mxl:** name the fabrics half of mxlStatus ([#79](https://github.com/qvest-digital/go-mxl/issues/79)) ([f6cefa7](https://github.com/qvest-digital/go-mxl/commit/f6cefa750be4b0d9c2de0131d973161c6c7c01c5))
+
 ## [1.0.0-rc.14](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.13...v1.0.0-rc.14) (2026-08-05)
 
 
