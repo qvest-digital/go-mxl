@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0-rc.1](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.15...v1.1.0-rc.1) (2026-08-13)
+
+
+### Features
+
+* build against libmxl 1.1.0-rc1 ([#84](https://github.com/qvest-digital/go-mxl/issues/84)) ([72cc7e2](https://github.com/qvest-digital/go-mxl/commit/72cc7e228c084b0d1291fbbc0c3f5a8e7c210d73))
+* **fabrics:** surface MXL_ERR_INTERRUPTED as ErrInterrupted ([#82](https://github.com/qvest-digital/go-mxl/issues/82)) ([0ab8666](https://github.com/qvest-digital/go-mxl/commit/0ab8666a5c02212423c62ae02a283c5ab192225a))
+
 ## [1.0.0-rc.15](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.14...v1.0.0-rc.15) (2026-08-11)
 
 
