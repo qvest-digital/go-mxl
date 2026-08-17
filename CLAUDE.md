@@ -85,35 +85,48 @@ working tree, the branch list, or the remote is out.
 
 ### Squash commit format for release-please
 
-GitHub's squash-merge uses the PR title as the resulting commit
-subject (with the PR number appended) and the PR body as the commit
-body. release-please parses that commit on `main` to decide what
-gets a changelog entry and how the version bumps. Two consequences:
+The repository is set to `squash_merge_commit_title=PR_TITLE` and
+`squash_merge_commit_message=COMMIT_MESSAGES`. The PR title becomes
+the commit subject with the PR number appended; the body is GitHub's
+bulleted list of the branch's commit messages. The PR description
+does not reach the commit at all.
+
+release-please reads that commit's subject, and footers -- the
+trailing block of `token: value` lines. The bulleted subjects in the
+body sit at column 0 with prose between them, so they are neither
+subject nor footer and produce no changelog entry. One squash is one
+entry, taken from the PR title. That is release-please's intended
+model rather than a defect: intra-PR churn ("fix a bug introduced two
+commits ago") never belonged in release notes.
+
+Three rules follow:
 
 1. **PR title is Conventional Commits.** Write the PR title in
    `<type>(<scope>): <subject>` form just as if it were a single
    commit subject. Subject `<= 72` chars, imperative mood.
-2. **Multiple release-relevant changes go in the PR body, at the
-   bottom, one per line.** release-please reads additional
-   conventional-commit footer lines and emits one changelog entry
-   per line. Add them after the prose explanation, separated by a
-   blank line. Example:
+2. **A PR carrying more than one release-relevant change is split,
+   or carries a `BEGIN_COMMIT_OVERRIDE` block in its PR body.**
+   release-please reads that block from the pull request over the
+   API, so it works even though `COMMIT_MESSAGES` discards the body.
+   The block replaces the whole commit message, so it repeats the
+   entry the title would have produced:
 
    ```
-   feat(docker): support linux/arm64 in published images
+   BEGIN_COMMIT_OVERRIDE
+   feat(docker): support linux/arm64 in published images (#42)
 
-   CI matrix now builds both linux/amd64 and linux/arm64 per tag, so
-   Apple Silicon devs get a native pull under Docker Desktop with no
-   QEMU tax.
-
-   fix(docker): drop TARGETARCH default so buildx auto-fills it
+   fix(docker): drop TARGETARCH default so buildx auto-fills it (#42)
+   END_COMMIT_OVERRIDE
    ```
 
-   That single squash commit produces two release-relevant entries:
-   the `feat(docker)` (driving a minor bump) and the `fix(docker)`
-   (a patch entry under the same release). Use `BREAKING CHANGE:`
-   or `BREAKING-CHANGE:` (release-please accepts both) and
-   `Release-As: X.Y.Z` for explicit overrides.
+   Adding the block to an already merged PR works: the next
+   release-please run rebuilds the pending release PR from it.
+3. **`!`, `BREAKING CHANGE:` (or `BREAKING-CHANGE:`, both are
+   accepted) and `Release-As: X.Y.Z` go on the PR title or in the
+   override block.** All three are parsed as footers, so they take
+   effect only at the bottom of the squashed message. A branch with
+   more than one commit ends in prose, and a footer written into an
+   intermediate commit is silently inert.
 
 ### Tearing down a worktree
 
@@ -137,10 +150,11 @@ harness.
 - Use Conventional Commits: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`,
   `test:`, `ci:`, `build:`, `perf:`, `style:`. Breaking changes get `!`
   (`feat!:`) or a `BREAKING CHANGE:` footer.
-- Prefer small, focused commits. The release tooling derives version
-  bumps and the changelog from commit subjects.
-- Subject line ≤ 50 chars, imperative mood ("add", "fix", not "added",
-  "fixes") — a local pre-commit hook rejects longer subjects. Body
+- Prefer small, focused commits. They survive in the squashed body as
+  the record of how the change was built; the release tooling reads
+  the PR title, not them.
+- Subject line <= 50 chars, imperative mood ("add", "fix", not "added",
+  "fixes") -- a local pre-commit hook rejects longer subjects. Body
   wraps at 72. The PR title (consumed as the squash-merge subject)
   uses the 72-char cap noted in the squash-format section above.
 
