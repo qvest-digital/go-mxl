@@ -29,9 +29,9 @@ ARG GO_VERSION=1.26.0
 ARG DEBIAN_TAG=13
 
 # renovate: datasource=github-releases depName=linux-rdma/rdma-core
-ARG RDMA_CORE_VERSION=v63.0
+ARG RDMA_CORE_VERSION=v64.0
 # renovate: datasource=github-releases depName=ofiwg/libfabric
-ARG LIBFABRIC_VERSION=v2.5.1
+ARG LIBFABRIC_VERSION=v2.6.0
 
 
 # Stage 1: build the full rdma-core + libfabric userspace stack from
