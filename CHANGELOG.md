@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0-rc.2](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.1...v1.1.0-rc.2) (2026-09-03)
+
+
+### Build System
+
+* **docker:** bump libmxl, libfabric, rdma-core ([#86](https://github.com/qvest-digital/go-mxl/issues/86)) ([8a61954](https://github.com/qvest-digital/go-mxl/commit/8a61954977b7cdb73ff7746816a129989c32c217))
+
 ## [1.1.0-rc.1](https://github.com/qvest-digital/go-mxl/compare/v1.0.0-rc.15...v1.1.0-rc.1) (2026-08-13)
 
 
