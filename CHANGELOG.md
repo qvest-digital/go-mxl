@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0-rc.3](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.2...v1.1.0-rc.3) (2026-09-05)
+
+
+### Dependencies
+
+* **libmxl:** build against the receive-window fix ([#88](https://github.com/qvest-digital/go-mxl/issues/88)) ([09120dc](https://github.com/qvest-digital/go-mxl/commit/09120dc0e4d450a1de96ead7893a322948869e16))
+
 ## [1.1.0-rc.2](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.1...v1.1.0-rc.2) (2026-09-03)
 
 
