@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0-rc.4](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.3...v1.1.0-rc.4) (2026-09-06)
+
+
+### Dependencies
+
+* **libmxl:** size a connectionless initiator's completion queue ([#91](https://github.com/qvest-digital/go-mxl/issues/91)) ([5603c8e](https://github.com/qvest-digital/go-mxl/commit/5603c8e17809d076fd4494db24259997ecba9d22))
+
 ## [1.1.0-rc.3](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.2...v1.1.0-rc.3) (2026-09-05)
 
 
