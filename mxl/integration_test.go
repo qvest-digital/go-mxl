@@ -5,6 +5,7 @@ package mxl_test
 import (
 	"errors"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -47,6 +48,13 @@ const audioFlowJSON = `{
 }`
 
 const audioFlowID = "b3bb5be7-9fe9-4324-a5bb-4c70e1084449"
+
+// A second video flow, so a synchronization group can hold two members.
+const video2FlowID = "0c7ae3a6-6b0e-4b1c-9d52-2f7d1f3c8a41"
+
+var video2FlowJSON = strings.Replace(
+	strings.Replace(videoFlowJSON, videoFlowID, video2FlowID, 1),
+	"go-mxl test:Video", "go-mxl test 2:Video", 1)
 
 func newDomain(t *testing.T) *mxl.Instance {
 	t.Helper()
@@ -260,5 +268,76 @@ func TestSyncGroupGrain(t *testing.T) {
 	// After removal an empty group should immediately satisfy any wait.
 	if err := g.WaitForDataAt(ts, 50*time.Millisecond); err != nil && !errors.Is(err, mxl.ErrTimeout) {
 		t.Fatalf("WaitForDataAt after RemoveReader: %v", err)
+	}
+}
+
+// A group keeps synchronizing after it promotes its slowest member.
+// libmxl moves the member with the largest observed source delay to the
+// front of the group; before 1.1.0 the move emptied the group when that
+// member was the last one, and every later wait returned at once.
+func TestSyncGroupWaitsAfterReorder(t *testing.T) {
+	inst := newDomain(t)
+
+	writers := make([]*mxl.Writer, 2)
+	readers := make([]*mxl.Reader, 2)
+	for i, f := range []struct{ json, id string }{{videoFlowJSON, videoFlowID}, {video2FlowJSON, video2FlowID}} {
+		w, _, err := inst.NewWriter(f.json)
+		if err != nil {
+			t.Fatalf("NewWriter(%s): %v", f.id, err)
+		}
+		t.Cleanup(func() { w.Close() })
+		r, err := inst.NewReader(f.id)
+		if err != nil {
+			t.Fatalf("NewReader(%s): %v", f.id, err)
+		}
+		t.Cleanup(func() { r.Close() })
+		writers[i], readers[i] = w, r
+	}
+
+	g, err := inst.NewSyncGroup()
+	if err != nil {
+		t.Fatalf("NewSyncGroup: %v", err)
+	}
+	t.Cleanup(func() { g.Close() })
+	for _, r := range readers {
+		if err := g.AddReader(r); err != nil {
+			t.Fatalf("AddReader: %v", err)
+		}
+	}
+
+	rate := writers[0].Config().Common.GrainRate
+	idx := mxl.CurrentIndex(rate) + 1
+
+	// The second member arrives later, which is what triggers the promotion.
+	errs := make(chan error, 2)
+	for i, delay := range []time.Duration{50 * time.Millisecond, 250 * time.Millisecond} {
+		go func(w *mxl.Writer, delay time.Duration) {
+			time.Sleep(delay)
+			ga, err := w.OpenGrain(idx)
+			if err != nil {
+				errs <- err
+				return
+			}
+			errs <- ga.Commit(ga.TotalSlices, 0)
+		}(writers[i], delay)
+	}
+	if err := g.WaitForDataAt(mxl.IndexToTimestamp(rate, idx), 2*time.Second); err != nil {
+		t.Fatalf("first WaitForDataAt: %v", err)
+	}
+	for range 2 {
+		if err := <-errs; err != nil {
+			t.Fatalf("commit: %v", err)
+		}
+	}
+
+	// Nothing is ever written at this index, so the group has to wait out
+	// the timeout rather than report the data as present.
+	start := time.Now()
+	err = g.WaitForDataAt(mxl.IndexToTimestamp(rate, idx+1000), 200*time.Millisecond)
+	if err == nil {
+		t.Fatal("WaitForDataAt for a grain nobody writes returned no error")
+	}
+	if elapsed := time.Since(start); elapsed < 150*time.Millisecond {
+		t.Fatalf("WaitForDataAt returned after %v, want the 200ms timeout", elapsed)
 	}
 }
