@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0-rc.6](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.5...v1.1.0-rc.6) (2026-09-29)
+
+
+### Dependencies
+
+* **libmxl:** log retried fabrics calls at debug ([#95](https://github.com/qvest-digital/go-mxl/issues/95)) ([96e550f](https://github.com/qvest-digital/go-mxl/commit/96e550f01a393ce59920db6b0f0cb90ac67cabeb))
+
 ## [1.1.0-rc.5](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.4...v1.1.0-rc.5) (2026-09-29)
 
 
