@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0-rc.5](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.4...v1.1.0-rc.5) (2026-09-29)
+
+
+### Dependencies
+
+* **libmxl:** build against upstream main with the EFA fixes ([#93](https://github.com/qvest-digital/go-mxl/issues/93)) ([600fb15](https://github.com/qvest-digital/go-mxl/commit/600fb15854d6230ecde64ed27e51cf0e892d45c6))
+
 ## [1.1.0-rc.4](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.3...v1.1.0-rc.4) (2026-09-06)
 
 
