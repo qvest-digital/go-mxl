@@ -10,6 +10,7 @@ func TestDataFormatIsDiscrete(t *testing.T) {
 		{FormatVideo, true},
 		{FormatData, true},
 		{FormatAudio, false},
+		{FormatEvent, false},
 		{FormatUnspecified, false},
 	}
 	for _, c := range cases {
@@ -27,6 +28,7 @@ func TestDataFormatString(t *testing.T) {
 		{FormatVideo, "video"},
 		{FormatAudio, "audio"},
 		{FormatData, "data"},
+		{FormatEvent, "event"},
 		{FormatUnspecified, "unspecified"},
 		{DataFormat(0xDEADBEEF), "unknown"},
 	}
