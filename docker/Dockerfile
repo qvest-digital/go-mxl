@@ -123,17 +123,19 @@ ARG TARGETARCH
 # runtime libs are pulled in so the rdma-core .so's COPY'd from
 # libfabric-stack resolve at link time (libmxl-fabrics links against
 # libfabric, which links against librdmacm/libibverbs, which link
-# against libnl).
+# against libnl). clang-tools-19 carries clang-scan-deps, which CMake
+# runs to scan libmxl's C++20 sources for module dependencies.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-      build-essential cmake ninja-build clang-19 lld-19 \
+      build-essential cmake ninja-build clang-19 clang-tools-19 lld-19 \
       pkg-config bison flex curl zip unzip tar git ca-certificates \
       libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
       libnl-3-200 libnl-route-3-200 libudev1 \
  && rm -rf /var/lib/apt/lists/* \
  && ln -sf /usr/bin/clang-19    /usr/local/bin/clang \
  && ln -sf /usr/bin/clang++-19  /usr/local/bin/clang++ \
- && ln -sf /usr/bin/ld.lld-19   /usr/local/bin/ld.lld
+ && ln -sf /usr/bin/ld.lld-19   /usr/local/bin/ld.lld \
+ && ln -sf /usr/bin/clang-scan-deps-19 /usr/local/bin/clang-scan-deps
 
 RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-${TARGETARCH}.tar.gz" \
       | tar -C /usr/local -xz
