@@ -30,6 +30,12 @@ type InitiatorConfig struct {
 
 	// Options is a JSON-formatted options string passed through to
 	// libmxl-fabrics. Leave empty for the default options.
+	//
+	// Recognized field: "cqDepth" (number >= 1), the depth of the
+	// initiator's completion queue, which receives one completion per
+	// posted write. libmxl-fabrics documents raising it when many
+	// writes are in flight at once, with many targets or many slices
+	// per grain. Omitted leaves the implementation default.
 	Options string
 }
 
