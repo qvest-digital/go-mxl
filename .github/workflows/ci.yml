@@ -14,7 +14,7 @@ jobs:
   # Compute image registry references and tag list once so per-arch
   # build jobs and the manifest-merge job agree on what to publish.
   meta:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       builder: ${{ steps.m.outputs.builder }}
       runtime: ${{ steps.m.outputs.runtime }}
@@ -300,7 +300,7 @@ jobs:
   merge:
     needs: [meta, build]
     if: needs.meta.outputs.push == 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - name: Download digests
         uses: actions/download-artifact@v8
@@ -358,7 +358,7 @@ jobs:
   ci-summary:
     needs: [meta, build, merge]
     if: ${{ !cancelled() }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 2
     steps:
       - name: Verify upstream jobs
