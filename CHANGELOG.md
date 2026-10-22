@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.1.0-rc.7](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.6...v1.1.0-rc.7) (2026-10-22)
+
+
+### Features
+
+* **mxl:** report event flows in FlowConfig ([dab3756](https://github.com/qvest-digital/go-mxl/commit/dab3756ecc1dc908ec84590f1d9bac6b8dd9fba5))
+
+
+### Dependencies
+
+* **libmxl:** build against upstream main 4c05242 ([dab3756](https://github.com/qvest-digital/go-mxl/commit/dab3756ecc1dc908ec84590f1d9bac6b8dd9fba5))
+
+
+### Build System
+
+* **docker:** add clang-scan-deps to the builder ([dab3756](https://github.com/qvest-digital/go-mxl/commit/dab3756ecc1dc908ec84590f1d9bac6b8dd9fba5))
+
 ## [1.1.0-rc.6](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.5...v1.1.0-rc.6) (2026-09-29)
 
 
