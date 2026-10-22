@@ -30,7 +30,7 @@ jobs:
   # images. A GITHUB_TOKEN-driven tag push starts no downstream
   # workflow, so the images would never build.
   release-please:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: googleapis/release-please-action@v5
         with:
