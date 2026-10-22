@@ -56,6 +56,18 @@ var video2FlowJSON = strings.Replace(
 	strings.Replace(videoFlowJSON, videoFlowID, video2FlowID, 1),
 	"go-mxl test:Video", "go-mxl test 2:Video", 1)
 
+const eventFlowJSON = `{
+  "description": "go-mxl test events",
+  "format": "urn:x-nmos:format:event",
+  "label": "go-mxl test events",
+  "id": "8d0f6a52-3c1e-4b7a-9f2d-61c4e0a9b7d3",
+  "tags": { "urn:x-nmos:tag:grouphint/v1.0": ["go-mxl test:Event"] },
+  "grain_rate": { "numerator": 1000, "denominator": 1 },
+  "parents": []
+}`
+
+const eventFlowID = "8d0f6a52-3c1e-4b7a-9f2d-61c4e0a9b7d3"
+
 func newDomain(t *testing.T) *mxl.Instance {
 	t.Helper()
 	if _, err := os.Stat("/dev/shm"); err != nil {
@@ -339,5 +351,41 @@ func TestSyncGroupWaitsAfterReorder(t *testing.T) {
 	}
 	if elapsed := time.Since(start); elapsed < 150*time.Millisecond {
 		t.Fatalf("WaitForDataAt returned after %v, want the 200ms timeout", elapsed)
+	}
+}
+
+// An event flow's geometry sits in its own branch of the config union.
+// libmxl sizes the queue from the domain's history (200 ms by default)
+// at the flow's grain rate, and caps each entry at one data grain.
+func TestEventFlowConfig(t *testing.T) {
+	inst := newDomain(t)
+
+	w, _, err := inst.NewWriter(eventFlowJSON)
+	if err != nil {
+		t.Fatalf("NewWriter: %v", err)
+	}
+	t.Cleanup(func() { w.Close() })
+
+	r, err := inst.NewReader(eventFlowID)
+	if err != nil {
+		t.Fatalf("NewReader: %v", err)
+	}
+	t.Cleanup(func() { r.Close() })
+	rcfg, err := r.Config()
+	if err != nil {
+		t.Fatalf("Reader.Config: %v", err)
+	}
+
+	want := mxl.EventFlowConfig{EventCount: 200, EventPayloadSize: 4096}
+	for name, cfg := range map[string]mxl.FlowConfig{"writer": w.Config(), "reader": rcfg} {
+		if cfg.Common.Format != mxl.FormatEvent {
+			t.Errorf("%s: format = %s, want event", name, cfg.Common.Format)
+		}
+		if cfg.Event != want {
+			t.Errorf("%s: event config = %+v, want %+v", name, cfg.Event, want)
+		}
+		if cfg.Discrete != (mxl.DiscreteFlowConfig{}) || cfg.Continuous != (mxl.ContinuousFlowConfig{}) {
+			t.Errorf("%s: grain or sample config filled in on an event flow: %+v", name, cfg)
+		}
 	}
 }

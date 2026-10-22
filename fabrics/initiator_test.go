@@ -106,6 +106,49 @@ func TestInitiatorSetupClosedReader(t *testing.T) {
 	}
 }
 
+// Options reaches libmxl-fabrics' initiator setup, which reads cqDepth
+// from it and rejects a depth below one.
+func TestInitiatorSetupCqDepthOption(t *testing.T) {
+	parent, fi, _ := newTestFabrics(t)
+	r, err := parent.NewReader("5fbec3b1-1b0f-417d-9059-8b94a47197ed")
+	if err != nil {
+		t.Fatalf("NewReader: %v", err)
+	}
+	t.Cleanup(func() { r.Close() })
+
+	cases := []struct {
+		options string
+		wantErr error
+	}{
+		{`{"cqDepth": 64}`, nil},
+		{`{"cqDepth": 0}`, mxl.ErrInvalidArg},
+		{`{"cqDepth": "big"}`, mxl.ErrInvalidArg},
+	}
+	for _, c := range cases {
+		in, err := fi.NewInitiator()
+		if err != nil {
+			t.Fatalf("NewInitiator: %v", err)
+		}
+		err = in.Setup(InitiatorConfig{
+			Interface: InterfaceConfig{
+				Provider: ProviderTCP,
+				Address:  EndpointAddress{Node: "127.0.0.1", Service: "0"},
+			},
+			Reader:  r,
+			Options: c.options,
+		})
+		if c.wantErr == nil && err != nil {
+			t.Errorf("Setup(Options %s): %v, want nil", c.options, err)
+		}
+		if c.wantErr != nil && !errors.Is(err, c.wantErr) {
+			t.Errorf("Setup(Options %s): %v, want %v", c.options, err, c.wantErr)
+		}
+		if err := in.Close(); err != nil {
+			t.Fatalf("Initiator.Close: %v", err)
+		}
+	}
+}
+
 func TestInitiatorAddRemoveTargetNil(t *testing.T) {
 	_, fi, _ := newTestFabrics(t)
 	in, err := fi.NewInitiator()

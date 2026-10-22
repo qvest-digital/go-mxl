@@ -27,6 +27,10 @@ static inline mxlContinuousFlowConfigInfo const* mxl_go_config_continuous(mxlFlo
     return &c->continuous;
 }
 
+static inline mxlEventFlowConfigInfo const* mxl_go_config_event(mxlFlowConfigInfo const* c) {
+    return &c->event;
+}
+
 static inline void const* mxl_go_wrapped_fragment_ptr_ro(mxlWrappedMultiBufferSlice const* s, size_t i) {
     return s->base.fragments[i].pointer;
 }

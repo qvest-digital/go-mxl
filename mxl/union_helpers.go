@@ -15,3 +15,7 @@ func discreteFromUnion(c *C.mxlFlowConfigInfo) unsafe.Pointer {
 func continuousFromUnion(c *C.mxlFlowConfigInfo) unsafe.Pointer {
 	return unsafe.Pointer(C.mxl_go_config_continuous(c))
 }
+
+func eventFromUnion(c *C.mxlFlowConfigInfo) unsafe.Pointer {
+	return unsafe.Pointer(C.mxl_go_config_event(c))
+}

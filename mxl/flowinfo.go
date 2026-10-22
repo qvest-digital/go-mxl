@@ -7,7 +7,8 @@ package mxl
 import "C"
 
 // DataFormat mirrors mxlDataFormat. Discrete formats (video, data) use grain
-// I/O; continuous formats (audio) use sample I/O.
+// I/O; continuous formats (audio) use sample I/O. Event flows are a queue of
+// events and use neither; this package does not wrap libmxl's event I/O.
 type DataFormat uint32
 
 const (
@@ -15,6 +16,7 @@ const (
 	FormatVideo       DataFormat = C.MXL_DATA_FORMAT_VIDEO
 	FormatAudio       DataFormat = C.MXL_DATA_FORMAT_AUDIO
 	FormatData        DataFormat = C.MXL_DATA_FORMAT_DATA
+	FormatEvent       DataFormat = C.MXL_DATA_FORMAT_EVENT
 )
 
 // IsDiscrete reports whether this format uses discrete grains (vs continuous
@@ -31,6 +33,8 @@ func (f DataFormat) String() string {
 		return "audio"
 	case FormatData:
 		return "data"
+	case FormatEvent:
+		return "event"
 	case FormatUnspecified:
 		return "unspecified"
 	default:
@@ -85,12 +89,19 @@ type ContinuousFlowConfig struct {
 	BufferLength uint32
 }
 
+// EventFlowConfig holds event-queue-specific config.
+type EventFlowConfig struct {
+	EventCount       uint32 // ring slots for committed entries, fragments included
+	EventPayloadSize uint32 // maximum payload bytes of one entry
+}
+
 // FlowConfig is the immutable description of a flow. Exactly one of
-// Discrete/Continuous is meaningful, determined by Common.Format.
+// Discrete/Continuous/Event is meaningful, determined by Common.Format.
 type FlowConfig struct {
 	Common     CommonFlowConfig
 	Discrete   DiscreteFlowConfig   // valid iff Common.Format.IsDiscrete()
-	Continuous ContinuousFlowConfig // valid iff !Common.Format.IsDiscrete()
+	Continuous ContinuousFlowConfig // valid iff Common.Format == FormatAudio
+	Event      EventFlowConfig      // valid iff Common.Format == FormatEvent
 }
 
 // FlowRuntime is the mutable state of a flow: where the ring head is, last
@@ -125,7 +136,7 @@ func goFlowConfig(c *C.mxlFlowConfigInfo) FlowConfig {
 		out.Common.ID[i] = byte(c.common.id[i])
 	}
 	// The union: pick the right view based on format. The C union has the
-	// same offset for both branches, so reading the matching branch is safe.
+	// same offset for every branch, so reading the matching branch is safe.
 	if out.Common.Format.IsDiscrete() {
 		d := (*C.mxlDiscreteFlowConfigInfo)(discreteFromUnion(c))
 		out.Discrete.GrainCount = uint32(d.grainCount)
@@ -136,6 +147,10 @@ func goFlowConfig(c *C.mxlFlowConfigInfo) FlowConfig {
 		cont := (*C.mxlContinuousFlowConfigInfo)(continuousFromUnion(c))
 		out.Continuous.ChannelCount = uint32(cont.channelCount)
 		out.Continuous.BufferLength = uint32(cont.bufferLength)
+	} else if out.Common.Format == FormatEvent {
+		ev := (*C.mxlEventFlowConfigInfo)(eventFromUnion(c))
+		out.Event.EventCount = uint32(ev.eventCount)
+		out.Event.EventPayloadSize = uint32(ev.eventPayloadSize)
 	}
 	return out
 }
