@@ -45,8 +45,8 @@ func TestNewInstanceMissingDomain(t *testing.T) {
 	}
 }
 
-// newTestInstance opens a domain under /dev/shm so libmxl's tmpfs check is
-// satisfied. Skips when /dev/shm is unavailable.
+// newTestInstance opens a domain under /dev/shm, the tmpfs libmxl documents
+// domains should live on. Skips when /dev/shm is unavailable.
 func newTestInstance(t *testing.T) *Instance {
 	t.Helper()
 	if _, err := os.Stat("/dev/shm"); err != nil {

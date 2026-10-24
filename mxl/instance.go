@@ -40,7 +40,8 @@ func LibVersion() (Version, error) {
 }
 
 // IsTmpFs reports whether the given path resides on a RAM-backed filesystem
-// (tmpfs/ramfs on Linux). MXL domains must live on tmpfs for correctness.
+// (tmpfs/ramfs on Linux). libmxl documents that a domain should live on
+// tmpfs but does not check it; this is the check.
 func IsTmpFs(path string) (bool, error) {
 	cpath := C.CString(path)
 	defer C.free(unsafe.Pointer(cpath))
@@ -72,9 +73,8 @@ type Instance struct {
 }
 
 // NewInstance opens an MXL domain at the given filesystem path. The path must
-// exist and (on Linux) should be a tmpfs mount; this is enforced by libmxl
-// itself for some operations. options is currently unused by libmxl and may
-// be empty.
+// exist and should be a tmpfs mount; libmxl does not check this, IsTmpFs does.
+// options is currently unused by libmxl and may be empty.
 func NewInstance(domain, options string) (*Instance, error) {
 	cdomain := C.CString(domain)
 	defer C.free(unsafe.Pointer(cdomain))
