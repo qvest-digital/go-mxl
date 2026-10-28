@@ -113,9 +113,17 @@ func (i *Instance) Close() error {
 	return statusErr(rc)
 }
 
-// GarbageCollect removes stale flow files left behind by writers that crashed
-// without releasing them. libmxl runs this automatically on Create; long-
-// lived processes should call it periodically.
+// GarbageCollect removes every flow in the domain that no writer holds.
+// libmxl walks the domain and removes each flow directory whose data file
+// it can lock exclusively, which an attached writer prevents. Readers take
+// no lock, so a flow open only for reading is removed as well. A data file
+// this process cannot open is skipped: libmxl opens it with O_NOATIME,
+// which fails on a file another user owns without CAP_FOWNER.
+//
+// libmxl collects only when this is called; NewInstance and NewWriter do
+// not. Releasing the last writer of a flow removes that one flow, see
+// Writer.Close. libmxl does not report a failure of the walk itself: a
+// flow it cannot remove stays in the domain and no error is returned.
 func (i *Instance) GarbageCollect() error {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
