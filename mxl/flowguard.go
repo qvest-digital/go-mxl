@@ -85,16 +85,30 @@ func (g *flowGuard) release() error {
 	return err
 }
 
+// statPath resolves a path for pathStillOurs. A variable so a test can
+// see which paths are walked.
+var statPath = syscall.Stat
+
 // pathStillOurs reports whether path resolves to the same file the
 // guard holds. False means the flow directory was replaced while this
 // writer was live, so a delete driven off the path would land on
 // someone else's flow.
+//
+// The held file is asked first. A data file with no links left was
+// removed with its directory, and path then names a flow that is gone
+// or someone else's, so it is not resolved at all: on a domain that
+// waits for a missing flow name to appear, resolving it blocks Close
+// for the whole wait.
 func (g *flowGuard) pathStillOurs(path string) bool {
 	if g == nil || g.file == nil {
 		return false
 	}
+	var held syscall.Stat_t
+	if err := syscall.Fstat(int(g.file.Fd()), &held); err != nil || held.Nlink == 0 {
+		return false
+	}
 	var now syscall.Stat_t
-	if err := syscall.Stat(path, &now); err != nil {
+	if err := statPath(path, &now); err != nil {
 		return false
 	}
 	return now.Dev == g.stat.Dev && now.Ino == g.stat.Ino
