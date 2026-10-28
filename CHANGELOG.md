@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0-rc.8](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.7...v1.1.0-rc.8) (2026-10-28)
+
+
+### Dependencies
+
+* **libmxl:** keep an RC target listening on its published address ([#102](https://github.com/qvest-digital/go-mxl/issues/102)) ([b3ef212](https://github.com/qvest-digital/go-mxl/commit/b3ef21286259369d0ea660080f4b054aa7f21b08))
+
 ## [1.1.0-rc.7](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.6...v1.1.0-rc.7) (2026-10-22)
 
 
