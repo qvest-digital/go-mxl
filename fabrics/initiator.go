@@ -141,6 +141,63 @@ func (in *Initiator) RemoveTarget(info *TargetInfo) error {
 	return fabricsStatusErr(C.mxlFabricsInitiatorRemoveTarget(in.handle, info.handle))
 }
 
+// TargetState is the state of a target added to an initiator, as last
+// seen by MakeProgress.
+type TargetState int
+
+const (
+	// TargetConnecting is a target whose connection is being set up;
+	// transfers do not reach it yet.
+	TargetConnecting TargetState = C.MXL_FABRICS_TARGET_STATE_CONNECTING
+	// TargetConnected is a target that transfers are sent to.
+	TargetConnected TargetState = C.MXL_FABRICS_TARGET_STATE_CONNECTED
+	// TargetClosing is a target whose connection is being shut down;
+	// no new transfers are sent to it.
+	TargetClosing TargetState = C.MXL_FABRICS_TARGET_STATE_CLOSING
+)
+
+func (s TargetState) String() string {
+	switch s {
+	case TargetConnecting:
+		return "connecting"
+	case TargetConnected:
+		return "connected"
+	case TargetClosing:
+		return "closing"
+	}
+	return "unknown"
+}
+
+// TargetState reports the state of a target added to the initiator. It
+// makes no progress of its own.
+//
+// It returns an error matching mxl.ErrNotFound when the initiator does
+// not hold the target: one never added, one removed, or one whose
+// connection was closed or failed. A connection-oriented initiator does
+// not connect to such a target again, and MakeProgress keeps reporting
+// on its other targets, so this is the only way to tell; adding the
+// target again sets up a new connection.
+func (in *Initiator) TargetState(info *TargetInfo) (TargetState, error) {
+	in.mu.Lock()
+	defer in.mu.Unlock()
+	if in.handle == nil {
+		return 0, ErrClosed()
+	}
+	if info == nil {
+		return 0, ErrInvalidArg()
+	}
+	info.mu.Lock()
+	defer info.mu.Unlock()
+	if info.handle == nil {
+		return 0, ErrClosed()
+	}
+	var state C.mxlFabricsTargetState
+	if err := fabricsStatusErr(C.mxlFabricsInitiatorGetTargetState(in.handle, info.handle, &state)); err != nil {
+		return 0, err
+	}
+	return TargetState(state), nil
+}
+
 // TransferGrain enqueues a transfer of the slice range
 // [startSlice, endSlice) of grain at grainIdx to every added target.
 // The call is non-blocking; completion is driven by MakeProgress.
