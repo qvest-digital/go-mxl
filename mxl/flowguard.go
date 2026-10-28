@@ -62,15 +62,17 @@ func newFlowGuard(path string) (*flowGuard, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_SH|syscall.LOCK_NB); err != nil {
+	if err := flock(f, syscall.LOCK_SH|syscall.LOCK_NB); err != nil {
 		_ = f.Close()
 		return nil, fmt.Errorf("lock %s: %w", path, err)
 	}
 	g := &flowGuard{file: f}
-	if err := syscall.Fstat(int(f.Fd()), &g.stat); err != nil {
+	st, err := fileStat(f)
+	if err != nil {
 		_ = g.release()
 		return nil, fmt.Errorf("stat %s: %w", path, err)
 	}
+	g.stat = *st
 	return g, nil
 }
 
@@ -79,10 +81,38 @@ func (g *flowGuard) release() error {
 	if g == nil || g.file == nil {
 		return nil
 	}
-	_ = syscall.Flock(int(g.file.Fd()), syscall.LOCK_UN)
+	_ = flock(g.file, syscall.LOCK_UN)
 	err := g.file.Close()
 	g.file = nil
 	return err
+}
+
+// flock applies how to f's descriptor through its raw connection rather
+// than Fd, which would put the descriptor into blocking mode as a side
+// effect.
+func flock(f *os.File, how int) error {
+	rc, err := f.SyscallConn()
+	if err != nil {
+		return err
+	}
+	var lockErr error
+	if err := rc.Control(func(fd uintptr) { lockErr = syscall.Flock(int(fd), how) }); err != nil {
+		return err
+	}
+	return lockErr
+}
+
+// fileStat stats an open file through os.File.Stat, for the same reason.
+func fileStat(f *os.File) (*syscall.Stat_t, error) {
+	fi, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+	st, ok := fi.Sys().(*syscall.Stat_t)
+	if !ok {
+		return nil, fmt.Errorf("stat %s: no syscall.Stat_t", f.Name())
+	}
+	return st, nil
 }
 
 // statPath resolves a path for pathStillOurs. A variable so a test can
@@ -103,8 +133,7 @@ func (g *flowGuard) pathStillOurs(path string) bool {
 	if g == nil || g.file == nil {
 		return false
 	}
-	var held syscall.Stat_t
-	if err := syscall.Fstat(int(g.file.Fd()), &held); err != nil || held.Nlink == 0 {
+	if held, err := fileStat(g.file); err != nil || held.Nlink == 0 {
 		return false
 	}
 	var now syscall.Stat_t
