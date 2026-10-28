@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.1.0-rc.9](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.8...v1.1.0-rc.9) (2026-10-28)
+
+
+### Features
+
+* **fabrics:** add Initiator.TargetState ([a6e7aa3](https://github.com/qvest-digital/go-mxl/commit/a6e7aa3a7e8e18f608813e9f41d96fd6ba791e43))
+
+
+### Bug Fixes
+
+* **mxl:** close a writer without resolving its removed flow's name ([#104](https://github.com/qvest-digital/go-mxl/issues/104)) ([f1b4422](https://github.com/qvest-digital/go-mxl/commit/f1b44227766c8a5def7b7db5080c59b8f108d20d))
+* **mxl:** lock and stat the flow guard without Fd ([a6e7aa3](https://github.com/qvest-digital/go-mxl/commit/a6e7aa3a7e8e18f608813e9f41d96fd6ba791e43))
+
+
+### Dependencies
+
+* **libmxl:** report an initiator target's state ([a6e7aa3](https://github.com/qvest-digital/go-mxl/commit/a6e7aa3a7e8e18f608813e9f41d96fd6ba791e43))
+
 ## [1.1.0-rc.8](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.7...v1.1.0-rc.8) (2026-10-28)
 
 
