@@ -1,0 +1,111 @@
+verbs: make the rdma_cm local ACK timeout configurable
+
+rdma_cm derives the RoCE local ACK timeout from a fixed packet
+lifetime of 16, so every RC QP it sets up retries after
+4.096 us * 2^17 = 537 ms. A loss of the last packets of an RDMA write
+produces no NAK, so only that timer recovers it and the QP stalls for
+over half a second per lost tail.
+
+FI_VERBS_ACK_TIMEOUT sets the exponent (1 - 31) through
+rdma_set_option(RDMA_OPTION_ID_ACK_TIMEOUT) on the active side before
+route resolution and on the passive side before accept. The default,
+-1, leaves the kernel's choice in place; an out-of-range value is
+ignored with a warning rather than disabling the provider.
+
+Applies to libfabric v2.6.0 (prov/verbs).
+
+diff --git a/prov/verbs/src/verbs_cm.c b/prov/verbs/src/verbs_cm.c
+index 5f4a7ed..734246d 100644
+--- a/prov/verbs/src/verbs_cm.c
++++ b/prov/verbs/src/verbs_cm.c
+@@ -121,6 +121,19 @@ vrb_msg_ep_prepare_cm_data(const void *param, size_t param_size,
+ 	memcpy(cm_hdr->data, param, cm_hdr->size);
+ }
+ 
++void vrb_set_ack_timeout(struct rdma_cm_id *id)
++{
++	uint8_t timeout;
++
++	if (vrb_gl_data.ack_timeout < 0)
++		return;
++
++	timeout = (uint8_t) vrb_gl_data.ack_timeout;
++	if (rdma_set_option(id, RDMA_OPTION_ID, RDMA_OPTION_ID_ACK_TIMEOUT,
++			    &timeout, sizeof(timeout)))
++		VRB_WARN_ERRNO(FI_LOG_EP_CTRL, "rdma_set_option ACK_TIMEOUT");
++}
++
+ static inline void
+ vrb_ep_prepare_rdma_cm_param(struct rdma_conn_param *conn_param,
+ 				void *priv_data, size_t priv_data_size)
+@@ -255,6 +268,7 @@ vrb_msg_ep_accept(struct fid_ep *ep, const void *param, size_t paramlen)
+ 	ofi_genlock_lock(&vrb_ep2_progress(_ep)->ep_lock);
+ 	assert(_ep->state == VRB_REQ_RCVD);
+ 	_ep->state = VRB_ACCEPTING;
++	vrb_set_ack_timeout(_ep->id);
+ 	vrb_prof_func_start("rdma_accept");
+ 	ret = rdma_accept(_ep->id, &conn_param);
+ 	vrb_prof_func_end("rdma_accept");
+diff --git a/prov/verbs/src/verbs_eq.c b/prov/verbs/src/verbs_eq.c
+index dd3ef75..20c383e 100644
+--- a/prov/verbs/src/verbs_eq.c
++++ b/prov/verbs/src/verbs_eq.c
+@@ -902,6 +902,7 @@ vrb_eq_addr_resolved_event(struct vrb_ep *ep)
+ 	}
+ 
+ 	ep->state = VRB_RESOLVE_ROUTE;
++	vrb_set_ack_timeout(ep->id);
+ 	vrb_prof_func_start("rdma_resolve_route");
+ 	if (rdma_resolve_route(ep->id, VERBS_RESOLVE_TIMEOUT)) {
+ 		ep->state = VRB_DISCONNECTED;
+diff --git a/prov/verbs/src/verbs_init.c b/prov/verbs/src/verbs_init.c
+index 4ae7d20..1dd0c2d 100644
+--- a/prov/verbs/src/verbs_init.c
++++ b/prov/verbs/src/verbs_init.c
+@@ -51,6 +51,7 @@ struct vrb_gl_data vrb_gl_data = {
+ 	.def_rx_iov_limit	= 4,
+ 	.def_inline_size	= 256,
+ 	.min_rnr_timer		= VERBS_DEFAULT_MIN_RNR_TIMER,
++	.ack_timeout		= -1,
+ 	.use_odp		= 0,
+ 	.cqread_bunch_size	= 8,
+ 	.iface			= NULL,
+@@ -687,6 +688,17 @@ static int vrb_read_params(void)
+ 		VRB_WARN(FI_LOG_CORE, "Invalid value of min_rnr_timer\n");
+ 		return -FI_EINVAL;
+ 	}
++	if (vrb_get_param_int("ack_timeout", "Set the local ACK timeout of "
++			      "connected endpoints through rdma_cm, as the "
++			      "exponent of 4.096 us * 2^value (1 - 31). -1 "
++			      "leaves the kernel's choice in place",
++			      &vrb_gl_data.ack_timeout) ||
++	    (vrb_gl_data.ack_timeout != -1 &&
++	     (vrb_gl_data.ack_timeout < 1 || vrb_gl_data.ack_timeout > 31))) {
++		VRB_WARN(FI_LOG_CORE, "Invalid value of ack_timeout, "
++			 "keeping the kernel's choice\n");
++		vrb_gl_data.ack_timeout = -1;
++	}
+ 
+ 	if (vrb_get_param_bool("use_odp", "Enable on-demand paging memory "
+ 			       "registrations, if supported.  This is "
+diff --git a/prov/verbs/src/verbs_ofi.h b/prov/verbs/src/verbs_ofi.h
+index 90b7333..18ea1ff 100644
+--- a/prov/verbs/src/verbs_ofi.h
++++ b/prov/verbs/src/verbs_ofi.h
+@@ -179,6 +179,8 @@ extern struct dlist_entry vrb_devs;
+ typedef int (*vrb_nic_affinity_handler_t)(struct fi_info **info,
+ 	const struct fi_pci_attr *device_pci);
+ 
++void vrb_set_ack_timeout(struct rdma_cm_id *id);
++
+ extern struct vrb_gl_data {
+ 	int	def_tx_size;
+ 	int	def_rx_size;
+@@ -186,6 +188,7 @@ extern struct vrb_gl_data {
+ 	int	def_rx_iov_limit;
+ 	int	def_inline_size;
+ 	int	min_rnr_timer;
++	int	ack_timeout;
+ 	int	cqread_bunch_size;
+ 	int	use_odp;
+ 	char	*iface;
