@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0-rc.10](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.9...v1.1.0-rc.10) (2026-10-31)
+
+
+### Features
+
+* **docker:** make the libfabric verbs ACK timeout configurable ([#108](https://github.com/qvest-digital/go-mxl/issues/108)) ([5729fb9](https://github.com/qvest-digital/go-mxl/commit/5729fb9e8d2dd987a263e5d021f404ba6f07ddb9))
+* **fabrics:** add Initiator.TargetStats ([#107](https://github.com/qvest-digital/go-mxl/issues/107)) ([a504b22](https://github.com/qvest-digital/go-mxl/commit/a504b22dc1e82da00677c4a4588b37d5dc511579))
+
 ## [1.1.0-rc.9](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.8...v1.1.0-rc.9) (2026-10-28)
 
 
