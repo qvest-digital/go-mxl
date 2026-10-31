@@ -46,38 +46,6 @@ index 5f4a7ed..734246d 100644
  	vrb_prof_func_start("rdma_accept");
  	ret = rdma_accept(_ep->id, &conn_param);
  	vrb_prof_func_end("rdma_accept");
-diff --git a/prov/verbs/src/verbs_cm_xrc.c b/prov/verbs/src/verbs_cm_xrc.c
-index ab2e8fb..008b80d 100644
---- a/prov/verbs/src/verbs_cm_xrc.c
-+++ b/prov/verbs/src/verbs_cm_xrc.c
-@@ -307,6 +307,7 @@ int vrb_resend_shared_accept_xrc(struct vrb_xrc_ep *ep,
- 		conn_param.srq = 1;
- 	conn_param.qp_num = ep->tgt_ibv_qp->qp_num;
- 
-+	vrb_set_ack_timeout(id);
- 	return rdma_accept(id, &conn_param);
- }
- 
-@@ -359,6 +360,7 @@ int vrb_accept_xrc(struct vrb_xrc_ep *ep, int reciprocal,
- 	       ep->conn_state == VRB_XRC_ORIG_CONNECTED);
- 	vrb_next_xrc_conn_state(ep);
- 
-+	vrb_set_ack_timeout(ep->tgt_id);
- 	ret = rdma_accept(ep->tgt_id, &conn_param);
- 	if (OFI_UNLIKELY(ret)) {
- 		ret = -errno;
-diff --git a/prov/verbs/src/verbs_domain_xrc.c b/prov/verbs/src/verbs_domain_xrc.c
-index 2c95c94..8010ad4 100644
---- a/prov/verbs/src/verbs_domain_xrc.c
-+++ b/prov/verbs/src/verbs_domain_xrc.c
-@@ -338,6 +338,7 @@ int vrb_process_ini_conn(struct vrb_xrc_ep *ep,int reciprocal,
- 	       ep->conn_state == VRB_XRC_ORIG_CONNECTED);
- 	vrb_next_xrc_conn_state(ep);
- 
-+	vrb_set_ack_timeout(ep->base_ep.id);
- 	ret = rdma_resolve_route(ep->base_ep.id, VERBS_RESOLVE_TIMEOUT);
- 	if (ret) {
- 		ret = -errno;
 diff --git a/prov/verbs/src/verbs_eq.c b/prov/verbs/src/verbs_eq.c
 index dd3ef75..20c383e 100644
 --- a/prov/verbs/src/verbs_eq.c
