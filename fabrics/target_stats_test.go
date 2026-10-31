@@ -130,7 +130,7 @@ func TestInitiatorTargetStatsTCP(t *testing.T) {
 		s, err = initiator.TargetStats(info)
 		return err == nil && s.InFlight == 0
 	})
-	if s.Completed != 2 || s.LastCompletedIndex != 1 || s.Posted != s.Completed+s.Failed+s.InFlight {
+	if s.Completed != 2 || s.LastCompletedIndex != 1 || s.Posted != s.Completed+s.Failed+s.InFlight || s.AccountingErrors != 0 {
 		t.Fatalf("TargetStats after progress: %+v; want 2 completed up to index 1", s)
 	}
 }

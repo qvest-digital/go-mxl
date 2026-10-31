@@ -236,8 +236,15 @@ type TargetStats struct {
 	// including ones that report no completion.
 	WritesInFlight uint64
 	// BytesCompleted is the payload of the writes reported as
-	// delivered.
+	// delivered, including the chunks of a grain given up part way.
 	BytesCompleted uint64
+	// Torn is the completed grains whose source slot the producer had
+	// rewritten by the time the completion was read. An upper bound:
+	// the payload was read earlier than the completion.
+	Torn uint64
+	// AccountingErrors is completions that matched nothing recorded in
+	// flight. Always 0 unless libmxl-fabrics has a bug.
+	AccountingErrors uint64
 	// LastCompletedIndex is the grain index, or sample head index, of
 	// the last transfer reported as delivered, or NoIndex.
 	LastCompletedIndex uint64
@@ -273,6 +280,8 @@ func (in *Initiator) TargetStats(info *TargetInfo) (TargetStats, error) {
 		InFlight:           uint64(s.transfersInFlight),
 		WritesInFlight:     uint64(s.writesInFlight),
 		BytesCompleted:     uint64(s.bytesCompleted),
+		Torn:               uint64(s.transfersTorn),
+		AccountingErrors:   uint64(s.accountingErrors),
 		LastCompletedIndex: uint64(s.lastCompletedIndex),
 	}, nil
 }
