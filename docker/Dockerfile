@@ -46,7 +46,7 @@ ARG LIBFABRIC_VERSION
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       build-essential cmake ninja-build pkg-config \
-      autoconf automake libtool m4 \
+      autoconf automake libtool m4 patch \
       libnl-3-dev libnl-route-3-dev libudev-dev libsystemd-dev \
       python3 \
       curl ca-certificates \
@@ -86,12 +86,21 @@ RUN set -eu; \
 # --disable list explicitly turns off vendor providers we have no SDK
 # for and experimental providers we do not want surprise-enabling on a
 # future libfabric bump.
+#
+# docker/patches/libfabric/*.patch are applied in name order with no
+# fuzz, so a LIBFABRIC_VERSION bump the patches no longer fit fails
+# the build instead of shipping without them.
+COPY docker/patches/libfabric/ /tmp/libfabric-patches/
 RUN set -eu; \
     v=${LIBFABRIC_VERSION#v}; \
     curl -fsSL \
       "https://github.com/ofiwg/libfabric/archive/refs/tags/${LIBFABRIC_VERSION}.tar.gz" \
       | tar -xz -C /tmp; \
     cd /tmp/libfabric-${v}; \
+    for p in /tmp/libfabric-patches/*.patch; do \
+      patch -p1 --forward --fuzz=0 --no-backup-if-mismatch < "$p"; \
+    done; \
+    rm -rf /tmp/libfabric-patches; \
     PKG_CONFIG_PATH=/opt/libfabric/lib/pkgconfig \
     CPPFLAGS=-I/opt/libfabric/include \
     LDFLAGS="-L/opt/libfabric/lib -Wl,-rpath-link,/opt/libfabric/lib" \

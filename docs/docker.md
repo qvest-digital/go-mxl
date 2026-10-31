@@ -100,6 +100,14 @@ file. Both the builder and runtime stages `COPY --from=libfabric-stack`
 the installed `/opt/libfabric/` tree, so the upstream stack caches
 independently from the libmxl rebuild loop.
 
+`docker/patches/libfabric/*.patch` are applied to the libfabric
+sources before `configure`, in name order and without fuzz, so a
+`LIBFABRIC_VERSION` bump they no longer fit fails the build.
+
+| Patch | Effect |
+| --- | --- |
+| `0001-verbs-ack-timeout.patch` | Adds `FI_VERBS_ACK_TIMEOUT` (1 - 31, default -1). The verbs provider sets it as the RC local ACK timeout exponent (4.096 us * 2^value) through `rdma_set_option(RDMA_OPTION_ID_ACK_TIMEOUT)` before route resolution and before accept. -1 leaves rdma_cm's choice in place, which for RoCE is 17 (537 ms per retry). |
+
 ## Provider and hardware coverage
 
 The build flags pin the libfabric provider matrix below. Providers

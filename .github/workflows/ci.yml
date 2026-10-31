@@ -177,7 +177,9 @@ jobs:
       # landed inside the /opt/libfabric prefix with at least one
       # .driver entry; without it the verbs provider returns
       # -FI_ENODATA at runtime even though `fi_info -l` shows it
-      # registered.
+      # registered. The last grep finds the FI_VERBS_ACK_TIMEOUT help
+      # text in the installed library, which only the patched verbs
+      # provider carries.
       - name: EFA smoke (builder)
         run: |
           docker run --rm local/go-mxl-builder bash -ec '
@@ -189,6 +191,8 @@ jobs:
             test -e /opt/libfabric/lib/libfabric.so.1
             ls /opt/libfabric/etc/libibverbs.d/*.driver >/dev/null \
               || { echo "libibverbs.d empty or missing"; ls -la /opt/libfabric/etc/libibverbs.d/ 2>&1; exit 1; }
+            grep -rqaF "Set the local ACK timeout of connected endpoints" /opt/libfabric/lib/ \
+              || { echo "verbs ACK timeout patch not compiled in"; exit 1; }
           '
 
       # Build the runtime image locally so the runtime EFA smoke
