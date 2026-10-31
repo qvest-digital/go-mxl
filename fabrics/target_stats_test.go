@@ -13,8 +13,8 @@ import (
 
 // A tcp initiator holds at most "grainsInFlight" grains per target.
 // Offered more while no completion is read, it skips the rest for that
-// target without failing the call, and once progress reads the
-// completions the counters show what was delivered.
+// target, counts them and reports not-ready, and once progress reads
+// the completions the counters show what was delivered.
 func TestInitiatorTargetStatsTCP(t *testing.T) {
 	srcInst := newDomain(t)
 	tgtInst := newDomain(t)
@@ -110,8 +110,12 @@ func TestInitiatorTargetStatsTCP(t *testing.T) {
 
 	const offered = 5
 	for idx := uint64(0); idx < offered; idx++ {
-		if err := initiator.TransferGrain(idx, 0, 1080); err != nil {
+		err := initiator.TransferGrain(idx, 0, 1080)
+		if idx < 2 && err != nil {
 			t.Fatalf("TransferGrain(%d): %v", idx, err)
+		}
+		if idx >= 2 && !errors.Is(err, fabrics.ErrNotReady) {
+			t.Fatalf("TransferGrain(%d) beyond the window: %v, want ErrNotReady", idx, err)
 		}
 	}
 	s, err := initiator.TargetStats(info)

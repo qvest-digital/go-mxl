@@ -35,8 +35,9 @@ type InitiatorConfig struct {
 	// mxl/fabrics.h):
 	//   - "grainsInFlight" (1..MaxTransfersInFlight, default 8): grains
 	//     one target may have in flight. A grain offered to a target
-	//     whose window is full is skipped for that target only and
-	//     counted in TargetStats.Skipped.
+	//     whose window or send queue is full is skipped for that target
+	//     only and counted in TargetStats.Skipped; TransferGrain then
+	//     returns ErrNotReady after offering it to every target.
 	//   - "chunksPerGrain" (>= 1, default 1): calls to TransferGrain
 	//     that send one grain. With more than one, only the call that
 	//     ends the grain reports a completion and carries immediate
