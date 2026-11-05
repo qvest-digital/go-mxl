@@ -151,9 +151,7 @@ RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-${TARGETARCH}.tar.gz" \
 ENV PATH=/usr/local/go/bin:${PATH} \
     GOTOOLCHAIN=local
 
-# libmxl's CMake preset hard-codes the toolchain file at
-# `~/vcpkg/scripts/buildsystems/vcpkg.cmake`. CMake expands `~` to the
-# user's $HOME, so vcpkg has to live there (not at /opt/vcpkg).
+# libmxl's CMake presets take the toolchain file from $VCPKG_ROOT.
 # --filter=tree:0 keeps the clone small but still lets `git show`
 # resolve the builtin-baseline commit referenced in libmxl's vcpkg.json;
 # plain --depth 1 breaks vcpkg's baseline checkout.
