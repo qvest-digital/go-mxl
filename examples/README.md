@@ -24,6 +24,10 @@ write-samples -domain /dev/shm/mxl -flow-def flow.json
 read-samples  -domain /dev/shm/mxl -flow <flow-id>
 ```
 
+`write-samples -options '{"maxSyncBatchSizeHint":960,"maxCommitBatchSizeHint":480}'`
+creates the flow with those batch size hints instead of libmxl's 10 ms
+default.
+
 ## Multiple flows in lock-step
 
 `sync-group` ticks every time data is available at the requested
