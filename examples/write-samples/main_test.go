@@ -5,6 +5,9 @@ import (
 	"errors"
 	"flag"
 	"io"
+	"log"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -62,5 +65,58 @@ func TestFillSampleRamp(t *testing.T) {
 	}
 	if next != 259 {
 		t.Errorf("next = %d, want 259", next)
+	}
+}
+
+const audioFlowDef = `{"description":"write-samples test","format":"urn:x-nmos:format:audio",
+"label":"write-samples test","id":"b3bb5be7-9fe9-4324-a5bb-4c70e1084449",
+"tags":{"urn:x-nmos:tag:grouphint/v1.0":["write-samples test:Audio"]},
+"media_type":"audio/float32","sample_rate":{"numerator":48000},"channel_count":2,"bit_depth":32,"parents":[]}`
+
+// runLogged runs write-samples for one batch on a fresh domain and
+// returns what it logged.
+func runLogged(t *testing.T, args ...string) (string, error) {
+	t.Helper()
+	dir := t.TempDir()
+	def := filepath.Join(dir, "flow.json")
+	if err := os.WriteFile(def, []byte(audioFlowDef), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	log.SetOutput(&out)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	domain := filepath.Join(dir, "domain")
+	if err := os.Mkdir(domain, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	err := run(append([]string{"-domain", domain, "-flow-def", def, "-count", "480"}, args...), io.Discard)
+	return out.String(), err
+}
+
+// The options set the batch size hints of the flow the writer creates,
+// which a reader of the flow, a fabrics target among them, is sized by.
+func TestRunOptionsSetTheFlowsHints(t *testing.T) {
+	out, err := runLogged(t, "-options", `{"maxSyncBatchSizeHint":960,"maxCommitBatchSizeHint":480}`)
+	if err != nil {
+		t.Fatalf("run = %v", err)
+	}
+	if !strings.Contains(out, "syncHint=960 commitHint=480") {
+		t.Errorf("log = %q, want syncHint=960 commitHint=480", out)
+	}
+}
+
+func TestRunWithoutOptionsKeepsLibmxlDefaults(t *testing.T) {
+	out, err := runLogged(t)
+	if err != nil {
+		t.Fatalf("run = %v", err)
+	}
+	if !strings.Contains(out, "syncHint=480 commitHint=480") {
+		t.Errorf("log = %q, want libmxl's 10 ms default syncHint=480 commitHint=480", out)
+	}
+}
+
+func TestRunRejectsInvalidOptions(t *testing.T) {
+	if _, err := runLogged(t, "-options", `{"maxSyncBatchSizeHint":0}`); err == nil {
+		t.Fatal("run with a zero sync hint = nil, want libmxl's rejection")
 	}
 }

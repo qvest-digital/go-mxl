@@ -8,6 +8,9 @@
 //
 // Each sample byte is set to `(running_sample_index % 256)` so a matching
 // reader can verify continuity. Batch size defaults to ~10 ms of audio.
+// -options passes libmxl flow writer options, such as
+// {"maxSyncBatchSizeHint":960,"maxCommitBatchSizeHint":480}, which set
+// the batch size hints of a flow this writer creates.
 package main
 
 import (
@@ -66,6 +69,7 @@ func run(args []string, stderr io.Writer) error {
 		flowDef   = fs.String("flow-def", "", "Path to JSON flow definition")
 		batchSize = fs.Int("batch", 0, "Samples per batch (0 = ~10 ms)")
 		count     = fs.Int64("count", 0, "Stop after N samples (0 = run forever)")
+		options   = fs.String("options", "", "libmxl flow writer options (JSON)")
 	)
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -85,7 +89,7 @@ func run(args []string, stderr io.Writer) error {
 	}
 	defer inst.Close()
 
-	w, created, err := inst.NewWriter(string(def))
+	w, created, err := inst.NewWriterOpts(string(def), *options)
 	if err != nil {
 		return fmt.Errorf("NewWriter: %w", err)
 	}
@@ -102,8 +106,9 @@ func run(args []string, stderr io.Writer) error {
 	rate := cfg.Common.GrainRate
 	batch := defaultBatch(rate, *batchSize)
 	idx := mxl.CurrentIndex(rate)
-	log.Printf("writing flow sampleRate=%d/%d channels=%d batch=%d first-idx=%d",
-		rate.Num, rate.Den, cfg.Continuous.ChannelCount, batch, idx)
+	log.Printf("writing flow sampleRate=%d/%d channels=%d batch=%d syncHint=%d commitHint=%d first-idx=%d",
+		rate.Num, rate.Den, cfg.Continuous.ChannelCount, batch,
+		cfg.Common.MaxSyncBatchSizeHint, cfg.Common.MaxCommitBatchSizeHint, idx)
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
