@@ -50,7 +50,9 @@ func (i *Instance) NewWriter(flowDef string) (*Writer, bool, error) {
 }
 
 // NewWriterOpts is the option-taking variant of NewWriter. options is
-// currently unused by libmxl and may be empty.
+// libmxl's flow writer options JSON and may be empty. libmxl reads
+// maxSyncBatchSizeHint and maxCommitBatchSizeHint from it when it creates
+// the flow; opening a flow that exists keeps the hints it was created with.
 func (i *Instance) NewWriterOpts(flowDef, options string) (*Writer, bool, error) {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
