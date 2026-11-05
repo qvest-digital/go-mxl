@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.1.0-rc.11](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.10...v1.1.0-rc.11) (2026-11-05)
+
+
+### ⚠ BREAKING CHANGES
+
+* **fabrics:** drop fork-only initiator API
+
+### Dependencies
+
+* **libmxl:** build qvest-digital/mxl b3c5fd4, upstream 6e654e2 + fixes ([4a0b9c0](https://github.com/qvest-digital/go-mxl/commit/4a0b9c07c7883412d162cc2c463b2a775faa49bb))
+
+
+### Code Refactoring
+
+* **fabrics:** drop fork-only initiator API ([4a0b9c0](https://github.com/qvest-digital/go-mxl/commit/4a0b9c07c7883412d162cc2c463b2a775faa49bb))
+
 ## [1.1.0-rc.10](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.9...v1.1.0-rc.10) (2026-10-31)
 
 
