@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.1.0-rc.12](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.11...v1.1.0-rc.12) (2026-11-05)
+
+
+### Features
+
+* **examples:** add -options to write-samples ([#114](https://github.com/qvest-digital/go-mxl/issues/114)) ([5dd5d1a](https://github.com/qvest-digital/go-mxl/commit/5dd5d1ae0472bcea07d8662bb885969248dd7c9a))
+
+
+### Dependencies
+
+* **libmxl:** build qvest-digital/mxl e28eed9, upstream 6e654e2 + fixes ([58009ac](https://github.com/qvest-digital/go-mxl/commit/58009ac30b8df11fad4d11215d713d9e22c9afc6))
+
 ## [1.1.0-rc.11](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.10...v1.1.0-rc.11) (2026-11-05)
 
 
