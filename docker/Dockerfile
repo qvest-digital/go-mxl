@@ -25,7 +25,7 @@
 # upstream releases instead, so EFA, verbs (all rdma-core providers),
 # tcp, udp, and shm are all compiled in.
 
-ARG GO_VERSION=1.26.0
+ARG GO_VERSION=1.26.10
 ARG DEBIAN_TAG=13
 
 # renovate: datasource=github-releases depName=linux-rdma/rdma-core
@@ -230,6 +230,19 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       ca-certificates libnuma1 libuv1 libstdc++6 \
       libnl-3-200 libnl-route-3-200 libudev1 \
+ && rm -rf /var/lib/apt/lists/*
+
+# zlib1g in the Debian 13.7 base image lacks the fixes for
+# CVE-2026-76844 and CVE-2026-85091, published as deb13u1. Installing
+# it takes the newest version the archive has; the check fails the
+# build below the fixed one. Remove this block once
+# debian:${DEBIAN_TAG}-slim itself ships zlib1g at or above ZLIB_MIN.
+ARG ZLIB_MIN=1:1.3.dfsg+really1.3.1-1+deb13u1
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends zlib1g \
+ && v=$(dpkg-query -W -f='${Version}' zlib1g) \
+ && { dpkg --compare-versions "$v" ge "${ZLIB_MIN}" \
+      || { echo "zlib1g $v is below ${ZLIB_MIN}" >&2; exit 1; }; } \
  && rm -rf /var/lib/apt/lists/*
 
 # Pull in the rdma-core + libfabric userspace stack from the dedicated
