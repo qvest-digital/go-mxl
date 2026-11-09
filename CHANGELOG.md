@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0-rc.14](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.13...v1.1.0-rc.14) (2026-11-09)
+
+
+### Dependencies
+
+* **libmxl:** build qvest-digital/mxl 121615e, upstream 05b06b1 + fixes ([#118](https://github.com/qvest-digital/go-mxl/issues/118)) ([f5d3330](https://github.com/qvest-digital/go-mxl/commit/f5d33304310040e6636c2fd24c6ddcf7af3bde3c))
+
 ## [1.1.0-rc.13](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.12...v1.1.0-rc.13) (2026-11-05)
 
 
