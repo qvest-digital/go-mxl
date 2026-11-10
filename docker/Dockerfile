@@ -15,6 +15,12 @@
 # - runtime: Debian trixie-slim with the libmxl runtime shared objects
 #   and libfabric. No toolchain, no headers, no vcpkg artefacts.
 #
+# Whatever a stage compiles from source or unpacks from a download,
+# record it with docker/sbom.sh in the same RUN: no package manager
+# tracks it, so the image SBOM lists it only through these CycloneDX
+# fragments under /opt/<prefix>/share/sbom/, which every image built
+# FROM builder or runtime inherits. See docs/docker.md.
+#
 # The libmxl revision is taken from .github/libmxl.version (a GitHub
 # tree URL); pass --build-arg LIBMXL_VERSION=<url> to override.
 #
@@ -49,8 +55,10 @@ RUN apt-get update \
       autoconf automake libtool m4 patch \
       libnl-3-dev libnl-route-3-dev libudev-dev libsystemd-dev \
       python3 \
-      curl ca-certificates \
+      curl ca-certificates jq \
  && rm -rf /var/lib/apt/lists/*
+
+COPY docker/sbom.sh /tmp/sbom.sh
 
 # rdma-core: ships libibverbs, librdmacm, and the full set of
 # userspace verbs providers (efa, mlx5, mlx4, hns, irdma, siw, rxe,
@@ -67,9 +75,13 @@ RUN apt-get update \
 # drivers.
 RUN set -eu; \
     v=${RDMA_CORE_VERSION#v}; \
-    curl -fsSL \
-      "https://github.com/linux-rdma/rdma-core/archive/refs/tags/${RDMA_CORE_VERSION}.tar.gz" \
-      | tar -xz -C /tmp; \
+    url="https://github.com/linux-rdma/rdma-core/archive/refs/tags/${RDMA_CORE_VERSION}.tar.gz"; \
+    curl -fsSL -o /tmp/rdma-core.tar.gz "$url"; \
+    sh /tmp/sbom.sh source /opt/libfabric/share/sbom/libfabric-stack.cdx.json \
+      rdma-core "$v" "pkg:github/linux-rdma/rdma-core@${RDMA_CORE_VERSION}" \
+      "$url" /tmp/rdma-core.tar.gz; \
+    tar -xzf /tmp/rdma-core.tar.gz -C /tmp; \
+    rm /tmp/rdma-core.tar.gz; \
     cd /tmp/rdma-core-${v}; \
     cmake -B build -G Ninja \
         -DCMAKE_INSTALL_PREFIX=/opt/libfabric \
@@ -93,9 +105,13 @@ RUN set -eu; \
 COPY docker/patches/libfabric/ /tmp/libfabric-patches/
 RUN set -eu; \
     v=${LIBFABRIC_VERSION#v}; \
-    curl -fsSL \
-      "https://github.com/ofiwg/libfabric/archive/refs/tags/${LIBFABRIC_VERSION}.tar.gz" \
-      | tar -xz -C /tmp; \
+    url="https://github.com/ofiwg/libfabric/archive/refs/tags/${LIBFABRIC_VERSION}.tar.gz"; \
+    curl -fsSL -o /tmp/libfabric.tar.gz "$url"; \
+    sh /tmp/sbom.sh source /opt/libfabric/share/sbom/libfabric-stack.cdx.json \
+      libfabric "$v" "pkg:github/ofiwg/libfabric@${LIBFABRIC_VERSION}" \
+      "$url" /tmp/libfabric.tar.gz /tmp/libfabric-patches/*.patch; \
+    tar -xzf /tmp/libfabric.tar.gz -C /tmp; \
+    rm /tmp/libfabric.tar.gz; \
     cd /tmp/libfabric-${v}; \
     for p in /tmp/libfabric-patches/*.patch; do \
       patch -p1 --forward --fuzz=0 --no-backup-if-mismatch < "$p"; \
@@ -137,7 +153,7 @@ ARG TARGETARCH
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       build-essential cmake ninja-build clang-19 clang-tools-19 lld-19 \
-      pkg-config bison flex curl zip unzip tar git ca-certificates \
+      pkg-config bison flex curl zip unzip tar git ca-certificates jq \
       libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
       libnl-3-200 libnl-route-3-200 libudev1 \
  && rm -rf /var/lib/apt/lists/* \
@@ -180,6 +196,7 @@ ENV PKG_CONFIG_PATH=/opt/libfabric/lib/pkgconfig:/opt/libmxl/lib/pkgconfig \
 
 ARG LIBMXL_VERSION=
 COPY .github/libmxl.version /tmp/libmxl.version
+COPY docker/sbom.sh /tmp/sbom.sh
 RUN set -eu; \
     url=${LIBMXL_VERSION:-$(tr -d '[:space:]' < /tmp/libmxl.version)}; \
     rest=${url#https://github.com/}; \
@@ -209,7 +226,11 @@ RUN set -eu; \
     # arm64); the *-linux/ glob matches it without arch detection.
     cp build/Linux-Clang-Release/vcpkg_installed/*-linux/lib/pkgconfig/*.pc \
        /opt/libmxl/lib/pkgconfig/; \
-    rm -rf /tmp/mxl /tmp/libmxl.version
+    sh /tmp/sbom.sh git /opt/libmxl/share/sbom/libmxl.cdx.json libmxl /tmp/mxl; \
+    sh /tmp/sbom.sh git /opt/libmxl/share/sbom/libmxl.cdx.json vcpkg "$VCPKG_ROOT"; \
+    sh /tmp/sbom.sh vcpkg /opt/libmxl/share/sbom/libmxl.cdx.json \
+      build/Linux-Clang-Release/vcpkg_installed; \
+    rm -rf /tmp/mxl /tmp/libmxl.version /tmp/sbom.sh
 
 # `go build` runs `git status` for -buildvcs stamping. When the image
 # is mounted on a checkout owned by an arbitrary uid, git refuses with
@@ -254,6 +275,7 @@ RUN echo /opt/libfabric/lib > /etc/ld.so.conf.d/libfabric.conf \
  && ldconfig
 
 COPY --from=builder /opt/libmxl/lib/ /opt/libmxl/lib/
+COPY --from=builder /opt/libmxl/share/sbom/ /opt/libmxl/share/sbom/
 # Drop install-time artefacts (pkg-config, cmake exports) and libmxl's
 # bundled gstreamer plugin — the latter pulls a full gstreamer runtime
 # that this image deliberately omits.
