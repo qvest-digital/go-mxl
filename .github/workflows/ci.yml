@@ -325,13 +325,22 @@ jobs:
         env:
           BUILDER: ${{ needs.meta.outputs.builder }}@${{ steps.builder_push.outputs.digest }}
           RUNTIME: ${{ needs.meta.outputs.runtime }}@${{ steps.runtime_push.outputs.digest }}
+          ARCH: ${{ matrix.arch }}
         working-directory: ${{ runner.temp }}/sbom
         run: |
           set -eu
-          oras attach --artifact-type application/vnd.cyclonedx+json \
-            "$BUILDER" go-mxl-builder-${{ matrix.arch }}.cdx.json:application/vnd.cyclonedx+json
-          oras attach --artifact-type application/vnd.cyclonedx+json \
-            "$RUNTIME" go-mxl-runtime-${{ matrix.arch }}.cdx.json:application/vnd.cyclonedx+json
+          # The pushed digest is an index of the image and its provenance
+          # attestation. The merge job lists only the image manifest
+          # under the tags, so the SBOM goes on that manifest; on the
+          # index nothing reached through a tag would find it.
+          attach() {
+            manifest=$(docker buildx imagetools inspect --raw "$1" |
+              jq -r --arg a "$ARCH" '.manifests[] | select(.platform.architecture == $a) | .digest')
+            oras attach --artifact-type application/vnd.cyclonedx+json \
+              "${1%@*}@$manifest" "$2:application/vnd.cyclonedx+json"
+          }
+          attach "$BUILDER" "go-mxl-builder-$ARCH.cdx.json"
+          attach "$RUNTIME" "go-mxl-runtime-$ARCH.cdx.json"
 
       - name: Export digests
         if: needs.meta.outputs.push == 'true'
