@@ -235,6 +235,20 @@ the work that produced it. The same rules apply to PR descriptions.
   build tag keeps them out of a plain `go test ./...` for callers
   without that mount.
 
+## Images
+
+- Anything `docker/Dockerfile` compiles from source or unpacks from a
+  downloaded archive is recorded with `docker/sbom.sh`, in the same
+  `RUN` that fetches it, so the record holds what was actually built.
+  No package manager tracks such a build, and Trivy, which the CI
+  uses to generate the image SBOM, lists nothing it cannot find in
+  one. A kind of source the script does not cover yet gets its own
+  case there. The Go toolchain is the exception: Trivy identifies it
+  from its binaries.
+- Nothing fails when this is forgotten: the SBOM is silently
+  incomplete. Check the fragments under `/opt/*/share/sbom/` of a
+  locally built image after changing a stage.
+
 ## Graphify
 
 The [Graphify](https://github.com/safishamsi/graphify) knowledge
