@@ -1,0 +1,278 @@
+# Contributor notes (Claude and humans)
+
+Rules for working in this repository. Read them before opening a PR or
+running an automated assistant against this tree.
+
+## STOP. Use a git worktree.
+
+Before ANY mutation of this repository -- edit, write, commit,
+branch create, push, rebase, `gh pr create` -- the very first
+action of the session is to set up a dedicated `git worktree`.
+This rule has no exceptions. There is no change small enough to
+skip it: typos, single-line fixes, doc-only PRs, even edits to
+this file itself all require the same worktree dance.
+
+The repository is worked on by multiple parallel sessions and
+editors at once. Two writers in the same tree corrupt staging
+state, step on each other's branches, and lose work without
+warning -- the rule exists to make that physically impossible,
+not to be polite about it.
+
+Worktrees ALWAYS live under `<repo>/.claude/worktrees/`. Not
+next to the repo, not in `/tmp`, not anywhere else -- that path
+is the project's established convention and the location the
+harness manages.
+
+The preferred path is to delegate the mutation to a sub-agent
+with `isolation: "worktree"` on the Agent call. The harness
+then creates `<repo>/.claude/worktrees/agent-<id>/` automatically
+with a unique id, so two concurrent sub-agents never share a
+path. Do not assume a worktree from earlier in the session is
+still mounted.
+
+For a manual worktree (no sub-agent), pick a short random tag
+so two sessions on the same topic never collide, and place the
+worktree under `.claude/worktrees/`:
+
+```sh
+git fetch origin
+id=$(openssl rand -hex 4)
+git worktree add .claude/worktrees/<topic>-$id -b <topic> origin/main
+cd .claude/worktrees/<topic>-$id
+```
+
+All subsequent edits, commits, and pushes happen from the
+worktree.
+
+The only thing allowed in the main checkout is read-only
+inspection: `git log`, `git diff`, `git status`, `gh pr view`,
+reading files, grep / find. Anything that touches the index, the
+working tree, the branch list, or the remote is out.
+
+## Documentation
+
+- Keep `README.md` and code comments tight. State facts; don't speculate.
+- Do not write about how the binding "should be used" or "is ideal for"
+  any particular system. The binding wraps libmxl; downstream choice is
+  not ours to characterize.
+- Do not reference other projects (mediamtx, gstreamer, ffmpeg, ...) as
+  motivating consumers in docs, comments, or commit messages. They are
+  not part of the public contract.
+- Don't invent API behavior. If you can't verify it by reading libmxl's
+  headers or testing against a real install, leave it out.
+- Don't add SPDX headers or copyright lines to new files unless you're
+  preserving existing ones from an external source.
+
+## Branches and PRs
+
+- Direct commits to `main` are off by default. Every change opens a
+  feature branch and a PR against `main`. Commit directly to `main`
+  only when the maintainer has explicitly approved it for that
+  specific change.
+- Force-pushes are off by default. Force-pushing to `main` is
+  prohibited. Force-pushing to a feature branch is only permitted
+  with explicit approval, because another editor may be reviewing
+  the branch or checked out against it.
+- Merge PRs with **Squash and merge**. release-please derives version
+  bumps and changelog entries from the resulting single commit on
+  `main`, and a noisy merge of dozens of intermediate commits would
+  bury the release-relevant ones.
+- Delete the feature branch on the remote as soon as the PR is
+  merged (GitHub's "Delete branch" button on the merged PR, or the
+  repo-level "Automatically delete head branches" setting). Stale
+  remote branches confuse the next contributor's `git fetch` and
+  inflate `git branch -r` output.
+
+### Squash commit format for release-please
+
+The repository is set to `squash_merge_commit_title=PR_TITLE` and
+`squash_merge_commit_message=COMMIT_MESSAGES`. The PR title becomes
+the commit subject with the PR number appended; the body is GitHub's
+bulleted list of the branch's commit messages. The PR description
+does not reach the commit at all.
+
+release-please reads that commit's subject, and footers -- the
+trailing block of `token: value` lines. The bulleted subjects in the
+body sit at column 0 with prose between them, so they are neither
+subject nor footer and produce no changelog entry. One squash is one
+entry, taken from the PR title. That is release-please's intended
+model rather than a defect: intra-PR churn ("fix a bug introduced two
+commits ago") never belonged in release notes.
+
+Three rules follow:
+
+1. **PR title is Conventional Commits.** Write the PR title in
+   `<type>(<scope>): <subject>` form just as if it were a single
+   commit subject. Subject `<= 72` chars, imperative mood.
+2. **A PR carrying more than one release-relevant change is split,
+   or carries a `BEGIN_COMMIT_OVERRIDE` block in its PR body.**
+   release-please reads that block from the pull request over the
+   API, so it works even though `COMMIT_MESSAGES` discards the body.
+   The block replaces the whole commit message, so it repeats the
+   entry the title would have produced:
+
+   ```
+   BEGIN_COMMIT_OVERRIDE
+   feat(docker): support linux/arm64 in published images (#42)
+
+   fix(docker): drop TARGETARCH default so buildx auto-fills it (#42)
+   END_COMMIT_OVERRIDE
+   ```
+
+   Adding the block to an already merged PR works: the next
+   release-please run rebuilds the pending release PR from it.
+3. **`!`, `BREAKING CHANGE:` (or `BREAKING-CHANGE:`, both are
+   accepted) and `Release-As: X.Y.Z` go on the PR title or in the
+   override block.** All three are parsed as footers, so they take
+   effect only at the bottom of the squashed message. A branch with
+   more than one commit ends in prose, and a footer written into an
+   intermediate commit is silently inert.
+
+### Tearing down a worktree
+
+The `git worktree add` recipe lives in the "STOP. Use a git
+worktree." section above. After the PR has merged, drop the
+worktree, the local branch, and the now-stale remote tracking
+ref:
+
+```sh
+git worktree remove .claude/worktrees/<topic>-<id>
+git branch -D <topic>
+git fetch --prune origin
+```
+
+Teardown is only needed for the manual `git worktree add` path;
+sub-agent worktrees under `agent-<id>/` are cleaned up by the
+harness.
+
+## Commits
+
+- Use Conventional Commits: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`,
+  `test:`, `ci:`, `build:`, `perf:`, `style:`. Breaking changes get `!`
+  (`feat!:`) or a `BREAKING CHANGE:` footer.
+- Prefer small, focused commits. They survive in the squashed body as
+  the record of how the change was built; the release tooling reads
+  the PR title, not them.
+- Subject line <= 50 chars, imperative mood ("add", "fix", not "added",
+  "fixes") -- a local pre-commit hook rejects longer subjects. Body
+  wraps at 72. The PR title (consumed as the squash-merge subject)
+  uses the 72-char cap noted in the squash-format section above.
+
+### Message content
+
+A commit message documents why a change exists, in terms that stay
+useful when read alone, years later, by someone with no memory of
+the work that produced it. The same rules apply to PR descriptions.
+
+- Explain *why*. The diff shows *what*; don't restate it.
+- Stay scoped to this repository and this change. No speculation
+  about upstream, downstream, future work, or follow-ups. If
+  something was deliberately left out of the diff, name it and the
+  reason -- only when that omission matters for understanding the
+  present change.
+- Reference another repository or project only when its state is
+  the direct reason for the change (a dependency bump, a vendored
+  fix, an API contract pinned to a published version). Context for
+  reviewers, gratitude, or cross-linking belongs in the PR thread
+  or an issue, not the commit.
+- Write declarative facts. No personal pronouns ("I", "we", "you").
+  Don't address a reader: no "note that...", "as you can see...", "we
+  decided to...", "this should help...".
+- Don't narrate. No history of what was tried first, what failed,
+  or what alternatives were considered.
+- No filler verbs without specifics. "Clean up", "improve",
+  "refactor" alone tell nothing; either name the actual change or
+  drop the line.
+- No checklists, "Summary" / "Test plan" sections, marketing
+  phrasing, or emojis. Those belong in the PR description if
+  anywhere.
+- No tool-authored `Co-Authored-By:` trailers -- the message
+  describes the change, not the process that produced it.
+- Cross-reference an issue or PR only when its content is itself
+  the reason for the change (`closes #N` where the issue is the
+  why). Vague "see #N for context" pointers do not belong here.
+
+## Versioning and tags
+
+- The module path is `github.com/qvest-digital/go-mxl`. While the major
+  version is 0 or 1, tags are `vMAJOR.MINOR.PATCH` at the repo root.
+- For a future v2+, the module path must include the `/v2` suffix and
+  tags become `v2.0.0` etc. -- see <https://go.dev/ref/mod#major-version-suffixes>.
+- Releases are automated by `release-please` (see `.github/workflows/`).
+  Don't hand-tag or hand-edit `CHANGELOG.md` -- let the workflow do it.
+
+## Layout
+
+| Path | Contents |
+| --- | --- |
+| `mxl/` | Go binding for `libmxl` (instance, reader, writer, grain, flowinfo, sync group). The only package downstream importers use. |
+| `fabrics/` | Go binding for `libmxl-fabrics` (libfabric initiator / target endpoints). Separate package because not every libmxl install ships fabrics. |
+| `examples/` | Small `main` programs per API surface -- `write-grain`, `read-grain`, `write-samples`, `read-samples`, `sync-group`, `fabrics-target`, `fabrics-initiator`. See `examples/README.md`. |
+| `docker/` | `Dockerfile` for the published builder / runtime images. |
+| `docs/` | Long-form docs that do not belong in `README.md` (currently just `docker.md`). |
+
+## Build
+
+- The package is cgo. `libmxl` must be installed with headers and a
+  pkg-config file before `go build` works. See `README.md` for the
+  `PKG_CONFIG_PATH` / `CGO_LDFLAGS` knobs.
+- Plain unit + vet, no integration tag:
+
+  ```sh
+  go test ./...
+  go vet ./...
+  ```
+
+- Tests that exercise a writer<->reader round-trip live under build
+  tag `mxl_integration` and need a tmpfs-mounted `/dev/shm`. Run
+  them with:
+
+  ```sh
+  go test -tags mxl_integration ./...
+  ```
+
+  CI runs them in the builder image alongside the unit tests; the
+  build tag keeps them out of a plain `go test ./...` for callers
+  without that mount.
+
+## Images
+
+- Anything `docker/Dockerfile` compiles from source or unpacks from a
+  downloaded archive is recorded with `docker/sbom.sh`, in the same
+  `RUN` that fetches it, so the record holds what was actually built.
+  No package manager tracks such a build, and Trivy, which the CI
+  uses to generate the image SBOM, lists nothing it cannot find in
+  one. A kind of source the script does not cover yet gets its own
+  case there. The Go toolchain is the exception: Trivy identifies it
+  from its binaries.
+- Nothing fails when this is forgotten: the SBOM is silently
+  incomplete. Check the fragments under `/opt/*/share/sbom/` of a
+  locally built image after changing a stage.
+
+## Graphify
+
+The [Graphify](https://github.com/safishamsi/graphify) knowledge
+graph is generated locally and is not committed. `graphify-out/` is
+gitignored because its artifacts embed an absolute, machine-specific
+path (`graphify-out/.graphify_root`), and committing them churned
+dozens of files on every rebuild. Each contributor builds their own
+graph; the matching Claude Code Skill is tracked at
+`.claude/skills/graphify/`, so a fresh clone has the assistant
+integration and only needs one local build.
+
+- Build or refresh the graph with `graphify update .`. Extraction is
+  AST-only and needs no API key; `.graphifyignore` scopes it.
+- For codebase questions, prefer `graphify query "<question>"` over
+  wide grep/find sweeps once `graphify-out/graph.json` exists. Use
+  `graphify path "<A>" "<B>"` for relationships and
+  `graphify explain "<concept>"` for focused subgraphs.
+- Read `graphify-out/GRAPH_REPORT.md` only for broad architecture
+  context, not for symbol lookups.
+- To install the skill / hook in a fresh checkout, run
+  `graphify install --project`; it covers the per-platform
+  `graphify claude install` step in one go.
+
+## When in doubt
+
+Ask the maintainer before changing the public Go API, the module path,
+or the release/tagging strategy.
