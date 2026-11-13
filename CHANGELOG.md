@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.1.0-rc.15](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.14...v1.1.0-rc.15) (2026-11-13)
+
+
+### Features
+
+* **docker:** record source-built components in the SBOM ([#122](https://github.com/qvest-digital/go-mxl/issues/122)) ([c567792](https://github.com/qvest-digital/go-mxl/commit/c567792a7a9b3a20919d07fb5f2632c8713376a9))
+
+
+### Bug Fixes
+
+* **docker:** ship Go 1.26.10 and zlib deb13u1 ([#120](https://github.com/qvest-digital/go-mxl/issues/120)) ([4032226](https://github.com/qvest-digital/go-mxl/commit/40322266937909c904297eaa550321ee4dd9d1e1))
+
 ## [1.1.0-rc.14](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.13...v1.1.0-rc.14) (2026-11-09)
 
 
