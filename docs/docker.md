@@ -43,6 +43,42 @@ so the linked `libmxl.so` / `libmxl-fabrics.so` and the EFA-capable
 `libfabric.so.1` shipped under `/opt/libfabric/lib` resolve without
 extra wiring.
 
+## SBOM
+
+CI attaches a CycloneDX SBOM to each per-arch image in GHCR as an OCI
+referrer:
+
+```sh
+trivy image --sbom-sources oci --platform linux/amd64 \
+  ghcr.io/qvest-digital/go-mxl-runtime:<tag>
+```
+
+rdma-core, libfabric, libmxl and the vcpkg ports libmxl builds with
+are compiled from source, so no package manager in the image records
+them and an SBOM generated from the image alone misses them. Each
+build stage records what it compiled with `docker/sbom.sh`, in a
+CycloneDX fragment beside the installed files:
+
+| Fragment | Lists |
+| --- | --- |
+| `/opt/libfabric/share/sbom/libfabric-stack.cdx.json` | rdma-core and libfabric, with the release tarball's SHA-256 and the applied patches |
+| `/opt/libmxl/share/sbom/libmxl.cdx.json` | libmxl at the commit built, the vcpkg checkout that built it, and every vcpkg port installed for that build |
+
+vcpkg and its ports are the build inputs of libmxl, so the list is a
+superset of what an image carries: spdlog and fmt, for example, are
+linked statically into `libmxl{,-fabrics}.so`, while Catch2 serves
+libmxl's tests.
+
+An image built `FROM` builder or runtime inherits the fragments. Its
+SBOM is complete once their components are appended:
+
+```sh
+trivy image --format cyclonedx --output sbom.cdx.json "$IMAGE"
+{ cat sbom.cdx.json
+  docker run --rm --entrypoint sh "$IMAGE" -c 'cat /opt/*/share/sbom/*.cdx.json'
+} | jq -s '.[0].components += [.[1:][].components[]] | .[0]' > merged.cdx.json
+```
+
 ## Building locally
 
 ```sh
