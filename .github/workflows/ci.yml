@@ -234,6 +234,38 @@ jobs:
               || { echo "libibverbs.d empty or missing"; ls -la /opt/libfabric/etc/libibverbs.d/ 2>&1; exit 1; }
           '
 
+      # Pinned by commit: a tag of a third-party action can be moved.
+      - name: Set up Trivy
+        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: v0.76.2
+
+      # Trivy lists what dpkg and the Go binaries record. rdma-core,
+      # libfabric, libmxl and libmxl's vcpkg ports are compiled from
+      # source, so the Dockerfile records them in fragments under
+      # /opt/*/share/sbom/, appended here. The images pushed below are
+      # the same builds with labels added, so the file list matches.
+      - name: Generate SBOMs
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/sbom"
+          for image in builder runtime; do
+            out=${RUNNER_TEMP}/sbom/go-mxl-${image}-${{ matrix.arch }}.cdx.json
+            trivy image --quiet --format cyclonedx --output "$out.trivy" "local/go-mxl-${image}"
+            {
+              cat "$out.trivy"
+              docker run --rm --entrypoint sh "local/go-mxl-${image}" \
+                -c 'cat /opt/*/share/sbom/*.cdx.json'
+            } | jq -s '.[0].components += [.[1:][].components[]] | .[0]' > "$out"
+            rm "$out.trivy"
+          done
+
+      - name: Upload SBOMs
+        uses: actions/upload-artifact@v7
+        with:
+          name: sbom-${{ matrix.arch }}
+          path: ${{ runner.temp }}/sbom/
+
       # Re-run the builder build with push-by-digest output so the
       # registry gets a per-arch image identified only by digest. The
       # gha cache from the load step above keeps this near-instant.
@@ -279,6 +311,36 @@ jobs:
           cache-to: |
             type=gha,mode=max,scope=libfabric-stack-${{ matrix.arch }}
             type=gha,mode=max,scope=runtime-${{ matrix.arch }}
+
+      - name: Set up ORAS
+        if: needs.meta.outputs.push == 'true'
+        uses: oras-project/setup-oras@5e2f2482b30b0cb3e14e67f89a80c88c659a7c63 # v2.0.3
+        with:
+          version: 1.3.6
+
+      # Stored beside each per-arch image in GHCR as an OCI referrer, so
+      # the SBOM of a published tag outlives the workflow artifact.
+      - name: Attach SBOMs to the images
+        if: needs.meta.outputs.push == 'true'
+        env:
+          BUILDER: ${{ needs.meta.outputs.builder }}@${{ steps.builder_push.outputs.digest }}
+          RUNTIME: ${{ needs.meta.outputs.runtime }}@${{ steps.runtime_push.outputs.digest }}
+          ARCH: ${{ matrix.arch }}
+        working-directory: ${{ runner.temp }}/sbom
+        run: |
+          set -eu
+          # The pushed digest is an index of the image and its provenance
+          # attestation. The merge job lists only the image manifest
+          # under the tags, so the SBOM goes on that manifest; on the
+          # index nothing reached through a tag would find it.
+          attach() {
+            manifest=$(docker buildx imagetools inspect --raw "$1" |
+              jq -r --arg a "$ARCH" '.manifests[] | select(.platform.architecture == $a) | .digest')
+            oras attach --artifact-type application/vnd.cyclonedx+json \
+              "${1%@*}@$manifest" "$2:application/vnd.cyclonedx+json"
+          }
+          attach "$BUILDER" "go-mxl-builder-$ARCH.cdx.json"
+          attach "$RUNTIME" "go-mxl-runtime-$ARCH.cdx.json"
 
       - name: Export digests
         if: needs.meta.outputs.push == 'true'

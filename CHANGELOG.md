@@ -1,5 +1,59 @@
 # Changelog
 
+## [1.1.0-rc.15](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.14...v1.1.0-rc.15) (2026-11-13)
+
+
+### Features
+
+* **docker:** record source-built components in the SBOM ([#122](https://github.com/qvest-digital/go-mxl/issues/122)) ([c567792](https://github.com/qvest-digital/go-mxl/commit/c567792a7a9b3a20919d07fb5f2632c8713376a9))
+
+
+### Bug Fixes
+
+* **docker:** ship Go 1.26.10 and zlib deb13u1 ([#120](https://github.com/qvest-digital/go-mxl/issues/120)) ([4032226](https://github.com/qvest-digital/go-mxl/commit/40322266937909c904297eaa550321ee4dd9d1e1))
+
+## [1.1.0-rc.14](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.13...v1.1.0-rc.14) (2026-11-09)
+
+
+### Dependencies
+
+* **libmxl:** build qvest-digital/mxl 121615e, upstream 05b06b1 + fixes ([#118](https://github.com/qvest-digital/go-mxl/issues/118)) ([f5d3330](https://github.com/qvest-digital/go-mxl/commit/f5d33304310040e6636c2fd24c6ddcf7af3bde3c))
+
+## [1.1.0-rc.13](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.12...v1.1.0-rc.13) (2026-11-05)
+
+
+### Dependencies
+
+* **libmxl:** build qvest-digital/mxl f1033fa, upstream 6e654e2 + fixes ([0cfc7a0](https://github.com/qvest-digital/go-mxl/commit/0cfc7a066b8b2502c20b89cf56db59ba16c88d4a))
+
+## [1.1.0-rc.12](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.11...v1.1.0-rc.12) (2026-11-05)
+
+
+### Features
+
+* **examples:** add -options to write-samples ([#114](https://github.com/qvest-digital/go-mxl/issues/114)) ([5dd5d1a](https://github.com/qvest-digital/go-mxl/commit/5dd5d1ae0472bcea07d8662bb885969248dd7c9a))
+
+
+### Dependencies
+
+* **libmxl:** build qvest-digital/mxl e28eed9, upstream 6e654e2 + fixes ([58009ac](https://github.com/qvest-digital/go-mxl/commit/58009ac30b8df11fad4d11215d713d9e22c9afc6))
+
+## [1.1.0-rc.11](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.10...v1.1.0-rc.11) (2026-11-05)
+
+
+### ⚠ BREAKING CHANGES
+
+* **fabrics:** drop fork-only initiator API
+
+### Dependencies
+
+* **libmxl:** build qvest-digital/mxl b3c5fd4, upstream 6e654e2 + fixes ([4a0b9c0](https://github.com/qvest-digital/go-mxl/commit/4a0b9c07c7883412d162cc2c463b2a775faa49bb))
+
+
+### Code Refactoring
+
+* **fabrics:** drop fork-only initiator API ([4a0b9c0](https://github.com/qvest-digital/go-mxl/commit/4a0b9c07c7883412d162cc2c463b2a775faa49bb))
+
 ## [1.1.0-rc.10](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.9...v1.1.0-rc.10) (2026-10-31)
 
 

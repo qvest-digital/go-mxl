@@ -31,21 +31,9 @@ type InitiatorConfig struct {
 	// Options is a JSON-formatted options string passed through to
 	// libmxl-fabrics. Leave empty for the default options.
 	//
-	// Recognized fields, all optional (see mxlFabricsInitiatorSetup in
-	// mxl/fabrics.h):
-	//   - "grainsInFlight" (1..MaxTransfersInFlight, default 8): grains
-	//     one target may have in flight. A grain offered to a target
-	//     whose window or send queue is full is skipped for that target
-	//     only and counted in TargetStats.Skipped; TransferGrain then
-	//     returns ErrNotReady after offering it to every target.
-	//   - "chunksPerGrain" (>= 1, default 1): calls to TransferGrain
-	//     that send one grain. With more than one, only the call that
-	//     ends the grain reports a completion and carries immediate
-	//     data, so the target commits the grain once.
-	//   - "maxTargets" (>= 1, default 16): targets a connection-oriented
-	//     initiator holds at once; AddTarget fails beyond it.
-	//   - "cqDepth" (>= 1): overrides the completion queue depth, which
-	//     is otherwise sized for maxTargets full windows.
+	// Recognized field: "cqDepth" (number >= 1), the depth of the
+	// initiator's completion queue, which receives one completion per
+	// posted write. When omitted, libmxl-fabrics picks a default.
 	Options string
 }
 
@@ -149,141 +137,6 @@ func (in *Initiator) RemoveTarget(info *TargetInfo) error {
 		return ErrClosed()
 	}
 	return fabricsStatusErr(C.mxlFabricsInitiatorRemoveTarget(in.handle, info.handle))
-}
-
-// TargetState is the state of a target added to an initiator, as last
-// seen by MakeProgress.
-type TargetState int
-
-const (
-	// TargetConnecting is a target whose connection is being set up;
-	// transfers do not reach it yet.
-	TargetConnecting TargetState = C.MXL_FABRICS_TARGET_STATE_CONNECTING
-	// TargetConnected is a target that transfers are sent to.
-	TargetConnected TargetState = C.MXL_FABRICS_TARGET_STATE_CONNECTED
-	// TargetClosing is a target whose connection is being shut down;
-	// no new transfers are sent to it.
-	TargetClosing TargetState = C.MXL_FABRICS_TARGET_STATE_CLOSING
-)
-
-func (s TargetState) String() string {
-	switch s {
-	case TargetConnecting:
-		return "connecting"
-	case TargetConnected:
-		return "connected"
-	case TargetClosing:
-		return "closing"
-	}
-	return "unknown"
-}
-
-// TargetState reports the state of a target added to the initiator. It
-// makes no progress of its own.
-//
-// It returns an error matching mxl.ErrNotFound when the initiator does
-// not hold the target: one never added, one removed, or one whose
-// connection was closed or failed. A connection-oriented initiator does
-// not connect to such a target again, and MakeProgress keeps reporting
-// on its other targets, so this is the only way to tell; adding the
-// target again sets up a new connection.
-func (in *Initiator) TargetState(info *TargetInfo) (TargetState, error) {
-	in.mu.Lock()
-	defer in.mu.Unlock()
-	if in.handle == nil {
-		return 0, ErrClosed()
-	}
-	if info == nil {
-		return 0, ErrInvalidArg()
-	}
-	info.mu.Lock()
-	defer info.mu.Unlock()
-	if info.handle == nil {
-		return 0, ErrClosed()
-	}
-	var state C.mxlFabricsTargetState
-	if err := fabricsStatusErr(C.mxlFabricsInitiatorGetTargetState(in.handle, info.handle, &state)); err != nil {
-		return 0, err
-	}
-	return TargetState(state), nil
-}
-
-// MaxTransfersInFlight is the most transfers one target may have in
-// flight, whatever "grainsInFlight" asks for.
-const MaxTransfersInFlight = C.MXL_FABRICS_MAX_TRANSFERS_IN_FLIGHT
-
-// NoIndex is TargetStats.LastCompletedIndex before any transfer to the
-// target completed.
-const NoIndex = uint64(C.MXL_FABRICS_NO_INDEX)
-
-// TargetStats counts what an initiator did with the transfers it was
-// asked to send to one target. A transfer is one grain, or one batch
-// of samples. Posted always equals Completed + Failed + InFlight.
-type TargetStats struct {
-	// Posted is the transfers handed to the provider for the target.
-	Posted uint64
-	// Completed is the posted transfers reported as delivered.
-	Completed uint64
-	// Failed is the posted transfers that completed with an error or
-	// were lost with their connection.
-	Failed uint64
-	// Skipped is the transfers not sent to the target: its window or
-	// send queue was full, or it was not connected.
-	Skipped uint64
-	// InFlight is the posted transfers not yet reported.
-	InFlight uint64
-	// WritesInFlight is the writes the provider holds for the target,
-	// including ones that report no completion.
-	WritesInFlight uint64
-	// BytesCompleted is the payload of the writes reported as
-	// delivered, including the chunks of a grain given up part way.
-	BytesCompleted uint64
-	// Torn is the completed grains whose source slot the producer had
-	// rewritten by the time the completion was read. An upper bound:
-	// the payload was read earlier than the completion.
-	Torn uint64
-	// AccountingErrors is completions that matched nothing recorded in
-	// flight. Always 0 unless libmxl-fabrics has a bug.
-	AccountingErrors uint64
-	// LastCompletedIndex is the grain index, or sample head index, of
-	// the last transfer reported as delivered, or NoIndex.
-	LastCompletedIndex uint64
-}
-
-// TargetStats reports the transfer counters of a target added to the
-// initiator. It makes no progress of its own: a completion is counted
-// once MakeProgress has read it. It returns an error matching
-// mxl.ErrNotFound when the initiator does not hold the target.
-func (in *Initiator) TargetStats(info *TargetInfo) (TargetStats, error) {
-	in.mu.Lock()
-	defer in.mu.Unlock()
-	if in.handle == nil {
-		return TargetStats{}, ErrClosed()
-	}
-	if info == nil {
-		return TargetStats{}, ErrInvalidArg()
-	}
-	info.mu.Lock()
-	defer info.mu.Unlock()
-	if info.handle == nil {
-		return TargetStats{}, ErrClosed()
-	}
-	var s C.mxlFabricsTargetStats
-	if err := fabricsStatusErr(C.mxlFabricsInitiatorGetTargetStats(in.handle, info.handle, &s)); err != nil {
-		return TargetStats{}, err
-	}
-	return TargetStats{
-		Posted:             uint64(s.transfersPosted),
-		Completed:          uint64(s.transfersCompleted),
-		Failed:             uint64(s.transfersFailed),
-		Skipped:            uint64(s.transfersSkipped),
-		InFlight:           uint64(s.transfersInFlight),
-		WritesInFlight:     uint64(s.writesInFlight),
-		BytesCompleted:     uint64(s.bytesCompleted),
-		Torn:               uint64(s.transfersTorn),
-		AccountingErrors:   uint64(s.accountingErrors),
-		LastCompletedIndex: uint64(s.lastCompletedIndex),
-	}, nil
 }
 
 // TransferGrain enqueues a transfer of the slice range

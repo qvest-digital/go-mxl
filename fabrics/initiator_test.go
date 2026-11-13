@@ -162,12 +162,6 @@ func TestInitiatorAddRemoveTargetNil(t *testing.T) {
 	if err := in.RemoveTarget(nil); !errors.Is(err, mxl.ErrInvalidArg) {
 		t.Errorf("RemoveTarget(nil): %v, want ErrInvalidArg", err)
 	}
-	if _, err := in.TargetState(nil); !errors.Is(err, mxl.ErrInvalidArg) {
-		t.Errorf("TargetState(nil): %v, want ErrInvalidArg", err)
-	}
-	if _, err := in.TargetStats(nil); !errors.Is(err, mxl.ErrInvalidArg) {
-		t.Errorf("TargetStats(nil): %v, want ErrInvalidArg", err)
-	}
 }
 
 func TestInitiatorAddTargetClosedInfo(t *testing.T) {
@@ -231,12 +225,6 @@ func TestInitiatorMethodsAfterClose(t *testing.T) {
 	}
 	if err := in.RemoveTarget(&TargetInfo{}); !errors.Is(err, mxl.ErrClosed) {
 		t.Errorf("RemoveTarget after Close: %v, want ErrClosed", err)
-	}
-	if _, err := in.TargetState(&TargetInfo{}); !errors.Is(err, mxl.ErrClosed) {
-		t.Errorf("TargetState after Close: %v, want ErrClosed", err)
-	}
-	if _, err := in.TargetStats(&TargetInfo{}); !errors.Is(err, mxl.ErrClosed) {
-		t.Errorf("TargetStats after Close: %v, want ErrClosed", err)
 	}
 	if err := in.TransferGrain(0, 0, 1); !errors.Is(err, mxl.ErrClosed) {
 		t.Errorf("TransferGrain after Close: %v, want ErrClosed", err)
