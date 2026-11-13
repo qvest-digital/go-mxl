@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0-rc.16](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.15...v1.1.0-rc.16) (2026-11-13)
+
+
+### Miscellaneous
+
+* **deps:** update docker/dockerfile docker tag to v1.28 ([#90](https://github.com/qvest-digital/go-mxl/issues/90)) ([f2ffc2f](https://github.com/qvest-digital/go-mxl/commit/f2ffc2fcf8aa6dcd4cbc07396334c2505f31c93b))
+
 ## [1.1.0-rc.15](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.14...v1.1.0-rc.15) (2026-11-13)
 
 
