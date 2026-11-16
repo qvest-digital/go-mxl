@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0-rc.17](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.16...v1.1.0-rc.17) (2026-11-16)
+
+
+### Build System
+
+* **docker:** pin vcpkg and check tarball checksums ([#125](https://github.com/qvest-digital/go-mxl/issues/125)) ([f75d076](https://github.com/qvest-digital/go-mxl/commit/f75d076da8272cd8d1860acd2ccab790878291bf))
+* **docker:** pin vcpkg, check tarball checksums ([f75d076](https://github.com/qvest-digital/go-mxl/commit/f75d076da8272cd8d1860acd2ccab790878291bf))
+
 ## [1.1.0-rc.16](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.15...v1.1.0-rc.16) (2026-11-16)
 
 
