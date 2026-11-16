@@ -248,6 +248,10 @@ the work that produced it. The same rules apply to PR descriptions.
 - Nothing fails when this is forgotten: the SBOM is silently
   incomplete. Check the fragments under `/opt/*/share/sbom/` of a
   locally built image after changing a stage.
+- Every archive the Dockerfile downloads is checked against a SHA-256
+  ARG and every clone is checked out at a fixed commit, so a build
+  fetches what was reviewed.
+  A version bump updates its checksum in the same change.
 
 ## Graphify
 

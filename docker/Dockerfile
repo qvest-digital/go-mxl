@@ -4,7 +4,7 @@
 #
 # - libfabric-stack: Debian trixie with rdma-core and libfabric built
 #   from upstream release tarballs, installed under /opt/libfabric.
-#   Cached independently from builder and runtime — only invalidates
+#   Cached independently from builder and runtime -- only invalidates
 #   when the RDMA_CORE_VERSION / LIBFABRIC_VERSION ARGs or the base
 #   image change.
 # - builder: Debian trixie with the Go toolchain, clang-19, and libmxl
@@ -31,23 +31,36 @@
 # upstream releases instead, so EFA, verbs (all rdma-core providers),
 # tcp, udp, and shm are all compiled in.
 
+# Each tarball below is checked against its SHA-256, so a moved tag or
+# a swapped file fails the build. A version bump updates its
+# checksum in the same change.
 ARG GO_VERSION=1.26.10
+ARG GO_SHA256_AMD64=ccfe7ae822d2c2f41f4fe7c956199967a4dac22d0ee0d2b2bfdb440aab3b20c5
+ARG GO_SHA256_ARM64=3f4227ce7b206a513e794f1393adb473a07b46e94d18bd15d1c684bbb7319797
 ARG DEBIAN_TAG=13
 
 # renovate: datasource=github-releases depName=linux-rdma/rdma-core
 ARG RDMA_CORE_VERSION=v64.0
+ARG RDMA_CORE_SHA256=578ee82131b5aba9bbadaebaa624d2e873ec4103aac712ced74aedcae7bab0da
 # renovate: datasource=github-releases depName=ofiwg/libfabric
 ARG LIBFABRIC_VERSION=v2.6.0
+ARG LIBFABRIC_SHA256=16b3652f5f3ac59264443c768e79be5170efed82579d59db31be9a30649a0e5a
+
+# vcpkg at a fixed commit, which also fixes the vcpkg tool that
+# bootstrap-vcpkg.sh downloads and checks.
+ARG VCPKG_COMMIT=fe8e78fac7df2793f9848ed0d27aa59d9c035998
 
 
 # Stage 1: build the full rdma-core + libfabric userspace stack from
 # upstream releases, installed under /opt/libfabric. Cached
-# independently from builder and runtime — only invalidates when the
-# two ARGs above (or the base image) change.
+# independently from builder and runtime -- only invalidates when the
+# version ARGs above (or the base image) change.
 FROM debian:${DEBIAN_TAG} AS libfabric-stack
 
 ARG RDMA_CORE_VERSION
+ARG RDMA_CORE_SHA256
 ARG LIBFABRIC_VERSION
+ARG LIBFABRIC_SHA256
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
@@ -77,6 +90,7 @@ RUN set -eu; \
     v=${RDMA_CORE_VERSION#v}; \
     url="https://github.com/linux-rdma/rdma-core/archive/refs/tags/${RDMA_CORE_VERSION}.tar.gz"; \
     curl -fsSL -o /tmp/rdma-core.tar.gz "$url"; \
+    echo "${RDMA_CORE_SHA256}  /tmp/rdma-core.tar.gz" | sha256sum -c -; \
     sh /tmp/sbom.sh source /opt/libfabric/share/sbom/libfabric-stack.cdx.json \
       rdma-core "$v" "pkg:github/linux-rdma/rdma-core@${RDMA_CORE_VERSION}" \
       "$url" /tmp/rdma-core.tar.gz; \
@@ -107,6 +121,7 @@ RUN set -eu; \
     v=${LIBFABRIC_VERSION#v}; \
     url="https://github.com/ofiwg/libfabric/archive/refs/tags/${LIBFABRIC_VERSION}.tar.gz"; \
     curl -fsSL -o /tmp/libfabric.tar.gz "$url"; \
+    echo "${LIBFABRIC_SHA256}  /tmp/libfabric.tar.gz" | sha256sum -c -; \
     sh /tmp/sbom.sh source /opt/libfabric/share/sbom/libfabric-stack.cdx.json \
       libfabric "$v" "pkg:github/ofiwg/libfabric@${LIBFABRIC_VERSION}" \
       "$url" /tmp/libfabric.tar.gz /tmp/libfabric-patches/*.patch; \
@@ -138,6 +153,9 @@ RUN set -eu; \
 FROM debian:${DEBIAN_TAG} AS builder
 
 ARG GO_VERSION
+ARG GO_SHA256_AMD64
+ARG GO_SHA256_ARM64
+ARG VCPKG_COMMIT
 # buildx auto-populates TARGETARCH (amd64, arm64, …) when a value is
 # not supplied. An explicit default would shadow that, so leave it
 # blank.
@@ -162,8 +180,16 @@ RUN apt-get update \
  && ln -sf /usr/bin/ld.lld-19   /usr/local/bin/ld.lld \
  && ln -sf /usr/bin/clang-scan-deps-19 /usr/local/bin/clang-scan-deps
 
-RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-${TARGETARCH}.tar.gz" \
-      | tar -C /usr/local -xz
+RUN set -eu; \
+    case "$TARGETARCH" in \
+      amd64) sha=$GO_SHA256_AMD64 ;; \
+      arm64) sha=$GO_SHA256_ARM64 ;; \
+      *) echo "no Go checksum for $TARGETARCH" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL -o /tmp/go.tar.gz "https://go.dev/dl/go${GO_VERSION}.linux-${TARGETARCH}.tar.gz"; \
+    echo "$sha  /tmp/go.tar.gz" | sha256sum -c -; \
+    tar -C /usr/local -xzf /tmp/go.tar.gz; \
+    rm /tmp/go.tar.gz
 ENV PATH=/usr/local/go/bin:${PATH} \
     GOTOOLCHAIN=local
 
@@ -172,6 +198,7 @@ ENV PATH=/usr/local/go/bin:${PATH} \
 # resolve the builtin-baseline commit referenced in libmxl's vcpkg.json;
 # plain --depth 1 breaks vcpkg's baseline checkout.
 RUN git clone --filter=tree:0 https://github.com/microsoft/vcpkg.git /root/vcpkg \
+ && git -C /root/vcpkg checkout --quiet "$VCPKG_COMMIT" \
  && /root/vcpkg/bootstrap-vcpkg.sh -disableMetrics
 ENV VCPKG_ROOT=/root/vcpkg \
     PATH=/root/vcpkg:${PATH}

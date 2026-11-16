@@ -129,10 +129,11 @@ two independent ways:
 A dedicated `libfabric-stack` build stage compiles `rdma-core` and
 then `libfabric` from upstream release tarballs. The two versions
 are pinned via `RDMA_CORE_VERSION` and `LIBFABRIC_VERSION` ARGs at
-the top of `docker/Dockerfile`, each annotated with a
-`# renovate: datasource=github-releases` comment so Renovate
-proposes bumps directly against the Dockerfile — no separate pin
-file. Both the builder and runtime stages `COPY --from=libfabric-stack`
+the top of `docker/Dockerfile`, each with a `*_SHA256` ARG the
+downloaded tarball is checked against; a bump updates both. The
+`# renovate:` comments beside them take effect only once
+`renovate.json` enables `customManagers:dockerfileVersions`, which it
+does not. Both the builder and runtime stages `COPY --from=libfabric-stack`
 the installed `/opt/libfabric/` tree, so the upstream stack caches
 independently from the libmxl rebuild loop.
 
