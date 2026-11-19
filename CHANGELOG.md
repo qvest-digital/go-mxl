@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0-rc.18](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.17...v1.1.0-rc.18) (2026-11-19)
+
+
+### Bug Fixes
+
+* **docker:** ship Go 1.26.11 ([#127](https://github.com/qvest-digital/go-mxl/issues/127)) ([06aa665](https://github.com/qvest-digital/go-mxl/commit/06aa6651d82f5a9ccf9910f8952f9b50cca4f6b3))
+
 ## [1.1.0-rc.17](https://github.com/qvest-digital/go-mxl/compare/v1.1.0-rc.16...v1.1.0-rc.17) (2026-11-16)
 
 
